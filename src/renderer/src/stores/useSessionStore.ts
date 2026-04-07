@@ -282,10 +282,28 @@ export const useSessionStore = create<SessionState>()(
         initialMode?: SessionMode
       ) => {
         try {
-          // Resolve default agent SDK from settings
+          // Resolve default agent SDK from settings, with project + worktree override
           const { useSettingsStore } = await import('./useSettingsStore')
+          const { useProjectStore } = await import('./useProjectStore')
+          const projectRecord = useProjectStore.getState().projects.find(
+            (p) => p.id === projectId
+          )
+
+          // Look up worktree record early — used for both SDK and model resolution
+          type AgentSdkType = 'opencode' | 'claude-code' | 'codex' | 'terminal'
+          const worktreeMap = useWorktreeStore.getState().worktreesByProject
+          let worktreeRecord: { default_agent_sdk?: string | null; default_model_provider_id: string | null; default_model_id: string | null; default_model_variant: string | null } | undefined
+          for (const worktrees of worktreeMap.values()) {
+            worktreeRecord = worktrees.find((w) => w.id === worktreeId)
+            if (worktreeRecord) break
+          }
+
           const defaultAgentSdk =
-            agentSdkOverride ?? useSettingsStore.getState().defaultAgentSdk ?? 'opencode'
+            agentSdkOverride
+            ?? (worktreeRecord?.default_agent_sdk as AgentSdkType | undefined)
+            ?? (projectRecord?.default_agent_sdk as AgentSdkType | undefined)
+            ?? useSettingsStore.getState().defaultAgentSdk
+            ?? 'opencode'
 
           const isTerminal = defaultAgentSdk === 'terminal'
 
@@ -295,6 +313,24 @@ export const useSessionStore = create<SessionState>()(
           if (!isTerminal) {
             const { resolveModelForSdk } = await import('./useSettingsStore')
             const configuredDefaultSdk = useSettingsStore.getState().defaultAgentSdk ?? 'opencode'
+
+            // Priority 0a: worktree-level default model (reuse worktreeRecord from above)
+            if (worktreeRecord?.default_model_id) {
+              defaultModel = {
+                providerID: worktreeRecord.default_model_provider_id!,
+                modelID: worktreeRecord.default_model_id,
+                variant: worktreeRecord.default_model_variant ?? undefined
+              }
+            }
+
+            // Priority 0b: project-level default model
+            if (!defaultModel && projectRecord?.default_model_id) {
+              defaultModel = {
+                providerID: projectRecord.default_model_provider_id!,
+                modelID: projectRecord.default_model_id,
+                variant: projectRecord.default_model_variant ?? undefined
+              }
+            }
 
             // Priority 1: mode-specific default (only when session SDK matches the
             // configured default — mode defaults are set in that SDK's context)
@@ -1265,20 +1301,41 @@ export const useSessionStore = create<SessionState>()(
 
           const projectId = result.connection.members[0].project_id
 
-          // Determine default model and agent SDK from global settings
+          // Determine default model and agent SDK from settings, with project-level override
           let defaultModel: { providerID: string; modelID: string; variant?: string } | null = null
           let defaultAgentSdk: 'opencode' | 'claude-code' | 'codex' | 'terminal' = 'opencode'
           try {
             const { useSettingsStore } = await import('./useSettingsStore')
+            const { useProjectStore } = await import('./useProjectStore')
+            const projectRecord = useProjectStore.getState().projects.find(
+              (p) => p.id === projectId
+            )
             defaultAgentSdk =
-              agentSdkOverride ?? useSettingsStore.getState().defaultAgentSdk ?? 'opencode'
+              agentSdkOverride
+              ?? (projectRecord?.default_agent_sdk as
+                | 'opencode'
+                | 'claude-code'
+                | 'codex'
+                | 'terminal'
+                | undefined)
+              ?? useSettingsStore.getState().defaultAgentSdk
+              ?? 'opencode'
             // Terminal sessions skip model resolution
             if (defaultAgentSdk !== 'terminal') {
               const configuredDefaultSdk = useSettingsStore.getState().defaultAgentSdk ?? 'opencode'
 
+              // Priority 0: project-level default model
+              if (projectRecord?.default_model_id) {
+                defaultModel = {
+                  providerID: projectRecord.default_model_provider_id!,
+                  modelID: projectRecord.default_model_id,
+                  variant: projectRecord.default_model_variant ?? undefined
+                }
+              }
+
               // Priority 1: mode-specific default (only when session SDK matches the
               // configured default — mode defaults are set in that SDK's context)
-              if (defaultAgentSdk === configuredDefaultSdk) {
+              if (!defaultModel && defaultAgentSdk === configuredDefaultSdk) {
                 const modeModel = useSettingsStore
                   .getState()
                   .getModelForMode(initialMode ?? 'build')

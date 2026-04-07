@@ -1788,11 +1788,74 @@ export const messages: Record<AppLocale, MessageTree> = {
           description: "Commands to run before worktree archival. Failures won't block archival.",
           placeholder: 'pnpm run clean'
         },
+        defaultAgentSdk: {
+          label: 'Default Agent SDK',
+          description: 'Override the global default AI agent for sessions in this project.',
+          useGlobal: 'Use Global Default',
+          currentGlobal: 'Currently using global default: {sdk}'
+        },
+        defaultModel: {
+          label: 'Default Model',
+          description:
+            'Override the default model for new sessions in this project. Worktree-level overrides take priority.',
+          useGlobal: 'Use Global'
+        },
+        envVars: {
+          label: 'Environment Variables',
+          description:
+            'Key-value pairs injected into AI process environment (e.g. ANTHROPIC_API_KEY, CLAUDE_CODE_USE_BEDROCK). Worktree-level vars override project-level.'
+        },
+        sdkConfigs: {
+          label: 'Agent Configuration',
+          description:
+            'Per-SDK JSON config written before session start. Claude Code writes to .claude/settings.local.json. Worktree-level configs are deep-merged on top.',
+          claudeCode: 'Claude Code',
+          codex: 'Codex',
+          emptyHint: '{\n  "key": "value"\n}'
+        },
         cancel: 'Cancel',
         save: 'Save',
         saving: 'Saving...',
         saveSuccess: 'Project settings saved',
         saveError: 'Failed to save project settings'
+      },
+      worktreeSettings: {
+        title: 'Worktree Settings',
+        defaultAgentSdk: {
+          label: 'Default Agent SDK',
+          description: 'Override the project-level AI agent for sessions in this worktree.',
+          useProjectDefault: 'Use Project Default',
+          currentDefault: 'Currently using project default: {sdk}'
+        },
+        defaultModel: {
+          label: 'Default Model',
+          description:
+            'Override the default model for new sessions in this worktree. Takes priority over project-level.',
+          useProjectDefault: 'Use Project Default'
+        },
+        envVars: {
+          label: 'Environment Variables',
+          description:
+            'Key-value pairs injected into AI process environment. Overrides project-level vars with the same key.'
+        },
+        sdkConfigs: {
+          label: 'Agent Configuration',
+          description:
+            'Per-SDK JSON config merged with project-level settings. Claude Code writes to .claude/settings.local.json.',
+          claudeCode: 'Claude Code',
+          codex: 'Codex',
+          emptyHint: '{\n  "key": "value"\n}'
+        },
+        cancel: 'Cancel',
+        save: 'Save',
+        saving: 'Saving...',
+        saveSuccess: 'Worktree settings saved',
+        saveError: 'Failed to save worktree settings'
+      },
+      envVars: {
+        keyPlaceholder: 'KEY',
+        valuePlaceholder: 'value',
+        addVariable: 'Add Variable'
       },
       branchPicker: {
         title: 'New Workspace',
@@ -1937,6 +2000,11 @@ export const messages: Record<AppLocale, MessageTree> = {
         openInEditorError: 'Failed to open in editor',
         openInEditorDescription: 'Make sure VS Code is installed',
         pathCopied: 'Path copied to clipboard'
+      }
+    },
+    worktree: {
+      menu: {
+        settings: 'Settings'
       }
     },
     projectItem: {
@@ -3739,11 +3807,71 @@ export const messages: Record<AppLocale, MessageTree> = {
           description: '归档 worktree 前运行的命令。即使失败也不会阻止归档。',
           placeholder: 'pnpm run clean'
         },
+        defaultAgentSdk: {
+          label: '默认 Agent SDK',
+          description: '覆盖此项目中新建会话使用的全局默认 AI 代理。',
+          useGlobal: '使用全局默认',
+          currentGlobal: '当前使用全局默认：{sdk}'
+        },
+        defaultModel: {
+          label: '默认模型',
+          description: '覆盖此项目中新建会话的默认模型。Worktree 级别的设置优先。',
+          useGlobal: '使用全局'
+        },
+        envVars: {
+          label: '环境变量',
+          description:
+            '注入到 AI 进程环境的键值对（如 ANTHROPIC_API_KEY、CLAUDE_CODE_USE_BEDROCK）。Worktree 级别的同名变量会覆盖项目级别。'
+        },
+        sdkConfigs: {
+          label: 'Agent 配置',
+          description:
+            '按 SDK 分别设置的 JSON 配置，会话启动前写入。Claude Code 写入 .claude/settings.local.json。Worktree 级别的配置会深度合并覆盖。',
+          claudeCode: 'Claude Code',
+          codex: 'Codex',
+          emptyHint: '{\n  "key": "value"\n}'
+        },
         cancel: '取消',
         save: '保存',
         saving: '保存中...',
         saveSuccess: '项目设置已保存',
         saveError: '保存项目设置失败'
+      },
+      worktreeSettings: {
+        title: 'Worktree 设置',
+        defaultAgentSdk: {
+          label: '默认 Agent SDK',
+          description: '覆盖此 worktree 中新建会话使用的项目级 AI 代理。',
+          useProjectDefault: '使用项目默认',
+          currentDefault: '当前使用项目默认：{sdk}'
+        },
+        defaultModel: {
+          label: '默认模型',
+          description: '覆盖此 worktree 中新建会话的默认模型。优先于项目级别设置。',
+          useProjectDefault: '使用项目默认'
+        },
+        envVars: {
+          label: '环境变量',
+          description: '注入到 AI 进程环境的键值对。同名变量会覆盖项目级别的设置。'
+        },
+        sdkConfigs: {
+          label: 'Agent 配置',
+          description:
+            '按 SDK 分别设置的 JSON 配置，与项目级设置合并。Claude Code 会写入 .claude/settings.local.json。',
+          claudeCode: 'Claude Code',
+          codex: 'Codex',
+          emptyHint: '{\n  "key": "value"\n}'
+        },
+        cancel: '取消',
+        save: '保存',
+        saving: '保存中...',
+        saveSuccess: 'Worktree 设置已保存',
+        saveError: '保存 worktree 设置失败'
+      },
+      envVars: {
+        keyPlaceholder: '键名',
+        valuePlaceholder: '值',
+        addVariable: '添加变量'
       },
       branchPicker: {
         title: '新建工作区',
@@ -3888,6 +4016,11 @@ export const messages: Record<AppLocale, MessageTree> = {
         openInEditorError: '在编辑器中打开失败',
         openInEditorDescription: '请确认 VS Code 已安装',
         pathCopied: '路径已复制到剪贴板'
+      }
+    },
+    worktree: {
+      menu: {
+        settings: '设置'
       }
     },
     projectItem: {

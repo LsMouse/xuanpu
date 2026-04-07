@@ -41,6 +41,12 @@ interface Project {
   run_script: string | null
   archive_script: string | null
   auto_assign_port: boolean
+  default_agent_sdk: string | null
+  default_model_provider_id: string | null
+  default_model_id: string | null
+  default_model_variant: string | null
+  env_vars: string | null
+  sdk_configs: string | null
   sort_order: number
   created_at: string
   last_accessed_at: string
@@ -65,6 +71,12 @@ interface Worktree {
   context: string | null
   github_pr_number: number | null
   github_pr_url: string | null
+  default_model_provider_id: string | null
+  default_model_id: string | null
+  default_model_variant: string | null
+  env_vars: string | null
+  default_agent_sdk: string | null
+  sdk_configs: string | null
   created_at: string
   last_accessed_at: string
 }
@@ -243,6 +255,12 @@ declare global {
             run_script?: string | null
             archive_script?: string | null
             auto_assign_port?: boolean
+            default_agent_sdk?: string | null
+            default_model_provider_id?: string | null
+            default_model_id?: string | null
+            default_model_variant?: string | null
+            env_vars?: string | null
+            sdk_configs?: string | null
             last_accessed_at?: string
           }
         ) => Promise<Project | null>
@@ -269,6 +287,12 @@ declare global {
             status?: 'active' | 'archived'
             last_message_at?: number | null
             last_accessed_at?: string
+            default_model_provider_id?: string | null
+            default_model_id?: string | null
+            default_model_variant?: string | null
+            env_vars?: string | null
+            default_agent_sdk?: string | null
+            sdk_configs?: string | null
           }
         ) => Promise<Worktree | null>
         delete: (id: string) => Promise<boolean>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from '@/lib/toast'
-import { AlertTriangle, ImageIcon, X } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -11,34 +11,26 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
-import { useProjectStore, useSettingsStore } from '@/stores'
-import { LanguageIcon } from './LanguageIcon'
+import { useSettingsStore } from '@/stores'
 import { useI18n } from '@/i18n/useI18n'
 import { cn } from '@/lib/utils'
 import { ModelSelector } from '@/components/sessions/ModelSelector'
 import { EnvVarsEditor } from '@/components/shared/EnvVarsEditor'
 
-interface Project {
+interface WorktreeRecord {
   id: string
   name: string
   path: string
-  language: string | null
-  custom_icon: string | null
-  setup_script: string | null
-  run_script: string | null
-  archive_script: string | null
-  auto_assign_port: boolean
-  default_agent_sdk: string | null
   default_model_provider_id: string | null
   default_model_id: string | null
   default_model_variant: string | null
   env_vars: string | null
+  default_agent_sdk: string | null
   sdk_configs: string | null
 }
 
-interface ProjectSettingsDialogProps {
-  project: Project
+interface WorktreeSettingsDialogProps {
+  worktree: WorktreeRecord
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -50,6 +42,7 @@ function parseSdkConfigs(json: string | null): Record<string, string> {
   if (!json) return {}
   try {
     const parsed = JSON.parse(json)
+    // Store each SDK config as a pretty-printed JSON string for editing
     const result: Record<string, string> = {}
     for (const [key, value] of Object.entries(parsed)) {
       result[key] = typeof value === 'string' ? value : JSON.stringify(value, null, 2)
@@ -68,27 +61,22 @@ function serializeSdkConfigs(configs: Record<string, string>): string | null {
     try {
       result[key] = JSON.parse(trimmed)
     } catch {
+      // Store as-is if not valid JSON (user might be editing)
       result[key] = trimmed
     }
   }
   return Object.keys(result).length > 0 ? JSON.stringify(result) : null
 }
 
-export function ProjectSettingsDialog({
-  project,
+export function WorktreeSettingsDialog({
+  worktree,
   open,
   onOpenChange
-}: ProjectSettingsDialogProps): React.JSX.Element {
-  const { updateProject } = useProjectStore()
+}: WorktreeSettingsDialogProps): React.JSX.Element {
   const { t } = useI18n()
   const availableAgentSdks = useSettingsStore((state) => state.availableAgentSdks)
   const globalDefaultSdk = useSettingsStore((state) => state.defaultAgentSdk)
 
-  const [setupScript, setSetupScript] = useState('')
-  const [runScript, setRunScript] = useState('')
-  const [archiveScript, setArchiveScript] = useState('')
-  const [customIcon, setCustomIcon] = useState<string | null>(null)
-  const [autoAssignPort, setAutoAssignPort] = useState(false)
   const [defaultAgentSdk, setDefaultAgentSdk] = useState<string | null>(null)
   const [defaultModel, setDefaultModel] = useState<{
     providerID: string
@@ -100,64 +88,50 @@ export function ProjectSettingsDialog({
   const [activeConfigTab, setActiveConfigTab] = useState<SdkConfigTab>('claude-code')
   const [jsonError, setJsonError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [pickingIcon, setPickingIcon] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleEnvVarsChange = useCallback((v: Record<string, string>) => {
     setEnvVars(v)
   }, [])
 
-  // Load current values when dialog opens
   useEffect(() => {
     if (open) {
-      setSetupScript(project.setup_script ?? '')
-      setRunScript(project.run_script ?? '')
-      setArchiveScript(project.archive_script ?? '')
-      setCustomIcon(project.custom_icon ?? null)
-      setAutoAssignPort(project.auto_assign_port ?? false)
-      setDefaultAgentSdk(project.default_agent_sdk ?? null)
-      // Load default model
-      if (project.default_model_id) {
+      setDefaultAgentSdk(worktree.default_agent_sdk ?? null)
+      if (worktree.default_model_id) {
         setDefaultModel({
-          providerID: project.default_model_provider_id!,
-          modelID: project.default_model_id,
-          variant: project.default_model_variant ?? undefined
+          providerID: worktree.default_model_provider_id!,
+          modelID: worktree.default_model_id,
+          variant: worktree.default_model_variant ?? undefined
         })
       } else {
         setDefaultModel(null)
       }
-      // Load env vars
-      if (project.env_vars) {
+      if (worktree.env_vars) {
         try {
-          setEnvVars(JSON.parse(project.env_vars))
+          setEnvVars(JSON.parse(worktree.env_vars))
         } catch {
           setEnvVars({})
         }
       } else {
         setEnvVars({})
       }
-      // Load SDK configs
-      setSdkConfigs(parseSdkConfigs(project.sdk_configs))
+      setSdkConfigs(parseSdkConfigs(worktree.sdk_configs))
       setJsonError(null)
     }
   }, [
     open,
-    project.setup_script,
-    project.run_script,
-    project.archive_script,
-    project.custom_icon,
-    project.auto_assign_port,
-    project.default_agent_sdk,
-    project.default_model_provider_id,
-    project.default_model_id,
-    project.default_model_variant,
-    project.env_vars,
-    project.sdk_configs
+    worktree.default_agent_sdk,
+    worktree.default_model_provider_id,
+    worktree.default_model_id,
+    worktree.default_model_variant,
+    worktree.env_vars,
+    worktree.sdk_configs
   ])
 
   const handleConfigChange = useCallback(
     (value: string) => {
       setSdkConfigs((prev) => ({ ...prev, [activeConfigTab]: value }))
+      // Validate JSON
       const trimmed = value.trim()
       if (!trimmed || trimmed === '{}') {
         setJsonError(null)
@@ -173,39 +147,10 @@ export function ProjectSettingsDialog({
     [activeConfigTab]
   )
 
-  const handlePickIcon = async (): Promise<void> => {
-    setPickingIcon(true)
-    try {
-      const result = await window.projectOps.pickProjectIcon(project.id)
-      if (result.success && result.filename) {
-        setCustomIcon(result.filename)
-      }
-      // If cancelled, do nothing
-    } catch {
-      toast.error(t('dialogs.projectSettings.icon.pickError'))
-    } finally {
-      setPickingIcon(false)
-    }
-  }
-
-  const handleClearIcon = async (): Promise<void> => {
-    try {
-      await window.projectOps.removeProjectIcon(project.id)
-      setCustomIcon(null)
-    } catch {
-      toast.error(t('dialogs.projectSettings.icon.removeError'))
-    }
-  }
-
   const handleSave = async (): Promise<void> => {
     setSaving(true)
     try {
-      const success = await updateProject(project.id, {
-        setup_script: setupScript.trim() || null,
-        run_script: runScript.trim() || null,
-        archive_script: archiveScript.trim() || null,
-        custom_icon: customIcon,
-        auto_assign_port: autoAssignPort,
+      const result = await window.db.worktree.update(worktree.id, {
         default_agent_sdk: defaultAgentSdk,
         default_model_provider_id: defaultModel?.providerID ?? null,
         default_model_id: defaultModel?.modelID ?? null,
@@ -213,11 +158,11 @@ export function ProjectSettingsDialog({
         env_vars: Object.keys(envVars).length > 0 ? JSON.stringify(envVars) : null,
         sdk_configs: serializeSdkConfigs(sdkConfigs)
       })
-      if (success) {
-        toast.success(t('dialogs.projectSettings.saveSuccess'))
+      if (result) {
+        toast.success(t('dialogs.worktreeSettings.saveSuccess'))
         onOpenChange(false)
       } else {
-        toast.error(t('dialogs.projectSettings.saveError'))
+        toast.error(t('dialogs.worktreeSettings.saveError'))
       }
     } finally {
       setSaving(false)
@@ -228,75 +173,18 @@ export function ProjectSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t('dialogs.projectSettings.title')}</DialogTitle>
-          <DialogDescription className="text-xs truncate">{project.path}</DialogDescription>
+          <DialogTitle>{t('dialogs.worktreeSettings.title')}</DialogTitle>
+          <DialogDescription className="text-xs truncate">{worktree.path}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5">
-          {/* Project Icon */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">{t('dialogs.projectSettings.icon.label')}</label>
-            <p className="text-xs text-muted-foreground">
-              {t('dialogs.projectSettings.icon.description')}
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 flex items-center justify-center rounded-md border border-border bg-muted/30">
-                <LanguageIcon
-                  language={project.language}
-                  customIcon={customIcon}
-                  className="h-5 w-5 text-muted-foreground shrink-0"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={handlePickIcon}
-                  disabled={pickingIcon}
-                >
-                  <ImageIcon className="h-3 w-3 mr-1.5" />
-                  {pickingIcon
-                    ? t('dialogs.projectSettings.icon.changing')
-                    : t('dialogs.projectSettings.icon.change')}
-                </Button>
-                {customIcon && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={handleClearIcon}
-                  >
-                    <X className="h-3 w-3 mr-1.5" />
-                    {t('dialogs.projectSettings.icon.clear')}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Auto Port Assignment */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium">
-                  {t('dialogs.projectSettings.autoAssignPort.label')}
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  {t('dialogs.projectSettings.autoAssignPort.description')}
-                </p>
-              </div>
-              <Switch checked={autoAssignPort} onCheckedChange={setAutoAssignPort} />
-            </div>
-          </div>
-
           {/* Default Agent SDK */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">
-              {t('dialogs.projectSettings.defaultAgentSdk.label')}
+              {t('dialogs.worktreeSettings.defaultAgentSdk.label')}
             </label>
             <p className="text-xs text-muted-foreground">
-              {t('dialogs.projectSettings.defaultAgentSdk.description')}
+              {t('dialogs.worktreeSettings.defaultAgentSdk.description')}
             </p>
             <div className="flex gap-2 flex-wrap">
               <button
@@ -308,7 +196,7 @@ export function ProjectSettingsDialog({
                     : 'bg-muted/50 text-muted-foreground border-border hover:bg-accent/50'
                 )}
               >
-                {t('dialogs.projectSettings.defaultAgentSdk.useGlobal')}
+                {t('dialogs.worktreeSettings.defaultAgentSdk.useProjectDefault')}
               </button>
               {availableAgentSdks?.opencode && (
                 <button
@@ -363,7 +251,7 @@ export function ProjectSettingsDialog({
             </div>
             {defaultAgentSdk === null && (
               <p className="text-xs text-muted-foreground/70 italic">
-                {t('dialogs.projectSettings.defaultAgentSdk.currentGlobal', {
+                {t('dialogs.worktreeSettings.defaultAgentSdk.currentDefault', {
                   sdk:
                     globalDefaultSdk === 'claude-code'
                       ? 'Claude Code'
@@ -380,16 +268,13 @@ export function ProjectSettingsDialog({
           {/* Default Model */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">
-              {t('dialogs.projectSettings.defaultModel.label')}
+              {t('dialogs.worktreeSettings.defaultModel.label')}
             </label>
             <p className="text-xs text-muted-foreground">
-              {t('dialogs.projectSettings.defaultModel.description')}
+              {t('dialogs.worktreeSettings.defaultModel.description')}
             </p>
             <div className="flex items-center gap-2">
-              <ModelSelector
-                value={defaultModel}
-                onChange={setDefaultModel}
-              />
+              <ModelSelector value={defaultModel} onChange={setDefaultModel} />
               {defaultModel && (
                 <Button
                   variant="outline"
@@ -397,7 +282,7 @@ export function ProjectSettingsDialog({
                   className="h-7 text-xs shrink-0"
                   onClick={() => setDefaultModel(null)}
                 >
-                  {t('dialogs.projectSettings.defaultModel.useGlobal')}
+                  {t('dialogs.worktreeSettings.defaultModel.useProjectDefault')}
                 </Button>
               )}
             </div>
@@ -406,10 +291,10 @@ export function ProjectSettingsDialog({
           {/* Environment Variables */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">
-              {t('dialogs.projectSettings.envVars.label')}
+              {t('dialogs.worktreeSettings.envVars.label')}
             </label>
             <p className="text-xs text-muted-foreground">
-              {t('dialogs.projectSettings.envVars.description')}
+              {t('dialogs.worktreeSettings.envVars.description')}
             </p>
             <EnvVarsEditor value={envVars} onChange={handleEnvVarsChange} />
           </div>
@@ -417,10 +302,10 @@ export function ProjectSettingsDialog({
           {/* SDK Config (JSON) */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">
-              {t('dialogs.projectSettings.sdkConfigs.label')}
+              {t('dialogs.worktreeSettings.sdkConfigs.label')}
             </label>
             <p className="text-xs text-muted-foreground">
-              {t('dialogs.projectSettings.sdkConfigs.description')}
+              {t('dialogs.worktreeSettings.sdkConfigs.description')}
             </p>
             <div className="flex gap-1.5 mb-2">
               {SDK_CONFIG_TABS.map((tab) => (
@@ -438,8 +323,8 @@ export function ProjectSettingsDialog({
                   )}
                 >
                   {tab === 'claude-code'
-                    ? t('dialogs.projectSettings.sdkConfigs.claudeCode')
-                    : t('dialogs.projectSettings.sdkConfigs.codex')}
+                    ? t('dialogs.worktreeSettings.sdkConfigs.claudeCode')
+                    : t('dialogs.worktreeSettings.sdkConfigs.codex')}
                 </button>
               ))}
             </div>
@@ -447,7 +332,7 @@ export function ProjectSettingsDialog({
               ref={textareaRef}
               value={sdkConfigs[activeConfigTab] ?? ''}
               onChange={(e) => handleConfigChange(e.target.value)}
-              placeholder={t('dialogs.projectSettings.sdkConfigs.emptyHint')}
+              placeholder={t('dialogs.worktreeSettings.sdkConfigs.emptyHint')}
               rows={8}
               className="font-mono text-sm resize-y"
             />
@@ -458,65 +343,14 @@ export function ProjectSettingsDialog({
               </div>
             )}
           </div>
-
-          {/* Setup Script */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              {t('dialogs.projectSettings.setupScript.label')}
-            </label>
-            <p className="text-xs text-muted-foreground">
-              {t('dialogs.projectSettings.setupScript.description')}
-            </p>
-            <Textarea
-              value={setupScript}
-              onChange={(e) => setSetupScript(e.target.value)}
-              placeholder={t('dialogs.projectSettings.setupScript.placeholder')}
-              rows={4}
-              className="font-mono text-sm resize-y"
-            />
-          </div>
-
-          {/* Run Script */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              {t('dialogs.projectSettings.runScript.label')}
-            </label>
-            <p className="text-xs text-muted-foreground">
-              {t('dialogs.projectSettings.runScript.description')}
-            </p>
-            <Textarea
-              value={runScript}
-              onChange={(e) => setRunScript(e.target.value)}
-              placeholder={t('dialogs.projectSettings.runScript.placeholder')}
-              rows={4}
-              className="font-mono text-sm resize-y"
-            />
-          </div>
-
-          {/* Archive Script */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              {t('dialogs.projectSettings.archiveScript.label')}
-            </label>
-            <p className="text-xs text-muted-foreground">
-              {t('dialogs.projectSettings.archiveScript.description')}
-            </p>
-            <Textarea
-              value={archiveScript}
-              onChange={(e) => setArchiveScript(e.target.value)}
-              placeholder={t('dialogs.projectSettings.archiveScript.placeholder')}
-              rows={4}
-              className="font-mono text-sm resize-y"
-            />
-          </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t('dialogs.projectSettings.cancel')}
+            {t('dialogs.worktreeSettings.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? t('dialogs.projectSettings.saving') : t('dialogs.projectSettings.save')}
+            {saving ? t('dialogs.worktreeSettings.saving') : t('dialogs.worktreeSettings.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

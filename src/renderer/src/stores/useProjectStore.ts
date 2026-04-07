@@ -14,6 +14,12 @@ interface Project {
   run_script: string | null
   archive_script: string | null
   auto_assign_port: boolean
+  default_agent_sdk: string | null
+  default_model_provider_id: string | null
+  default_model_id: string | null
+  default_model_variant: string | null
+  env_vars: string | null
+  sdk_configs: string | null
   sort_order: number
   created_at: string
   last_accessed_at: string
@@ -48,6 +54,12 @@ interface ProjectState {
       run_script?: string | null
       archive_script?: string | null
       auto_assign_port?: boolean
+      default_agent_sdk?: string | null
+      default_model_provider_id?: string | null
+      default_model_id?: string | null
+      default_model_variant?: string | null
+      env_vars?: string | null
+      sdk_configs?: string | null
     }
   ) => Promise<boolean>
   selectProject: (id: string | null) => void
@@ -202,6 +214,12 @@ export const useProjectStore = create<ProjectState>()(
           run_script?: string | null
           archive_script?: string | null
           auto_assign_port?: boolean
+          default_agent_sdk?: string | null
+          default_model_provider_id?: string | null
+          default_model_id?: string | null
+          default_model_variant?: string | null
+          env_vars?: string | null
+          sdk_configs?: string | null
         }
       ) => {
         try {

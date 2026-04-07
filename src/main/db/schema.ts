@@ -1,4 +1,4 @@
-export const CURRENT_SCHEMA_VERSION = 11
+export const CURRENT_SCHEMA_VERSION = 14
 
 export const SCHEMA_SQL = `
 -- Projects table
@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS projects (
   custom_icon TEXT DEFAULT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0,
   auto_assign_port INTEGER NOT NULL DEFAULT 0,
+  default_agent_sdk TEXT DEFAULT NULL,
+  default_model_provider_id TEXT DEFAULT NULL,
+  default_model_id TEXT DEFAULT NULL,
+  default_model_variant TEXT DEFAULT NULL,
+  env_vars TEXT DEFAULT NULL,
+  sdk_configs TEXT DEFAULT NULL,
   created_at TEXT NOT NULL,
   last_accessed_at TEXT NOT NULL
 );
@@ -39,6 +45,12 @@ CREATE TABLE IF NOT EXISTS worktrees (
   context TEXT DEFAULT NULL,
   github_pr_number INTEGER DEFAULT NULL,
   github_pr_url TEXT DEFAULT NULL,
+  default_model_provider_id TEXT DEFAULT NULL,
+  default_model_id TEXT DEFAULT NULL,
+  default_model_variant TEXT DEFAULT NULL,
+  env_vars TEXT DEFAULT NULL,
+  default_agent_sdk TEXT DEFAULT NULL,
+  sdk_configs TEXT DEFAULT NULL,
   created_at TEXT NOT NULL,
   last_accessed_at TEXT NOT NULL
 );
@@ -316,5 +328,36 @@ export const MIGRATIONS: Migration[] = [
       DROP INDEX IF EXISTS idx_worktrees_project_status;
       DROP INDEX IF EXISTS idx_worktrees_status_message;
     `
+  },
+  {
+    version: 12,
+    name: 'add_project_default_agent_sdk',
+    up: `ALTER TABLE projects ADD COLUMN default_agent_sdk TEXT DEFAULT NULL`,
+    down: `-- SQLite cannot drop columns; this is a no-op for safety`
+  },
+  {
+    version: 13,
+    name: 'add_model_and_env_vars',
+    up: `
+      ALTER TABLE projects ADD COLUMN default_model_provider_id TEXT DEFAULT NULL;
+      ALTER TABLE projects ADD COLUMN default_model_id TEXT DEFAULT NULL;
+      ALTER TABLE projects ADD COLUMN default_model_variant TEXT DEFAULT NULL;
+      ALTER TABLE projects ADD COLUMN env_vars TEXT DEFAULT NULL;
+      ALTER TABLE worktrees ADD COLUMN default_model_provider_id TEXT DEFAULT NULL;
+      ALTER TABLE worktrees ADD COLUMN default_model_id TEXT DEFAULT NULL;
+      ALTER TABLE worktrees ADD COLUMN default_model_variant TEXT DEFAULT NULL;
+      ALTER TABLE worktrees ADD COLUMN env_vars TEXT DEFAULT NULL
+    `,
+    down: `-- SQLite cannot drop columns; this is a no-op for safety`
+  },
+  {
+    version: 14,
+    name: 'add_worktree_agent_sdk_and_sdk_configs',
+    up: `
+      ALTER TABLE worktrees ADD COLUMN default_agent_sdk TEXT DEFAULT NULL;
+      ALTER TABLE worktrees ADD COLUMN sdk_configs TEXT DEFAULT NULL;
+      ALTER TABLE projects ADD COLUMN sdk_configs TEXT DEFAULT NULL
+    `,
+    down: `-- SQLite cannot drop columns; this is a no-op for safety`
   }
 ]

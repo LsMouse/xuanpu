@@ -1,6 +1,11 @@
 import type { BrowserWindow } from 'electron'
 
-import type { AgentSdkCapabilities, AgentSdkImplementer, PromptOptions } from './agent-sdk-types'
+import type {
+  AgentSdkCapabilities,
+  AgentSdkImplementer,
+  ConnectOptions,
+  PromptOptions
+} from './agent-sdk-types'
 import { CODEX_CAPABILITIES } from './agent-sdk-types'
 import {
   getAvailableCodexModels,
@@ -321,7 +326,11 @@ export class CodexImplementer implements AgentSdkImplementer {
 
   // ── Lifecycle ────────────────────────────────────────────────────
 
-  async connect(worktreePath: string, hiveSessionId: string): Promise<{ sessionId: string }> {
+  async connect(
+    worktreePath: string,
+    hiveSessionId: string,
+    options?: ConnectOptions
+  ): Promise<{ sessionId: string }> {
     const resolvedModel = resolveCodexModelSlug(this.selectedModel)
     log.info('Connecting', { worktreePath, hiveSessionId, model: resolvedModel })
 
@@ -330,7 +339,8 @@ export class CodexImplementer implements AgentSdkImplementer {
 
     const providerSession = await this.manager.startSession({
       cwd: worktreePath,
-      model: resolvedModel
+      model: resolvedModel,
+      env: options?.env
     })
 
     const threadId = providerSession.threadId

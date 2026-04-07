@@ -1,5 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
+import type { ConnectOptions } from './agent-sdk-types'
 import { createLogger } from './logger'
 import { notificationService } from './notification-service'
 import { getDatabase } from '../db'
@@ -379,7 +380,11 @@ class OpenCodeService {
   /**
    * Connect to OpenCode for a worktree (lazy starts server if needed)
    */
-  async connect(worktreePath: string, hiveSessionId: string): Promise<{ sessionId: string }> {
+  async connect(
+    worktreePath: string,
+    hiveSessionId: string,
+    _options?: ConnectOptions
+  ): Promise<{ sessionId: string }> {
     log.info('Connecting to OpenCode', { worktreePath, hiveSessionId })
 
     const instance = await this.getOrCreateInstance()

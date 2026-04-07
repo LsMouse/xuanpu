@@ -195,6 +195,17 @@ export class DatabaseService {
     this.safeAddColumn('worktrees', 'github_pr_number', 'INTEGER DEFAULT NULL')
     this.safeAddColumn('worktrees', 'github_pr_url', 'TEXT DEFAULT NULL')
     this.safeAddColumn('connections', 'pinned', 'INTEGER NOT NULL DEFAULT 0')
+    this.safeAddColumn('projects', 'default_model_provider_id', 'TEXT DEFAULT NULL')
+    this.safeAddColumn('projects', 'default_model_id', 'TEXT DEFAULT NULL')
+    this.safeAddColumn('projects', 'default_model_variant', 'TEXT DEFAULT NULL')
+    this.safeAddColumn('projects', 'env_vars', 'TEXT DEFAULT NULL')
+    this.safeAddColumn('projects', 'sdk_configs', 'TEXT DEFAULT NULL')
+    this.safeAddColumn('worktrees', 'default_model_provider_id', 'TEXT DEFAULT NULL')
+    this.safeAddColumn('worktrees', 'default_model_id', 'TEXT DEFAULT NULL')
+    this.safeAddColumn('worktrees', 'default_model_variant', 'TEXT DEFAULT NULL')
+    this.safeAddColumn('worktrees', 'env_vars', 'TEXT DEFAULT NULL')
+    this.safeAddColumn('worktrees', 'default_agent_sdk', 'TEXT DEFAULT NULL')
+    this.safeAddColumn('worktrees', 'sdk_configs', 'TEXT DEFAULT NULL')
 
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_sessions_connection ON sessions(connection_id);
@@ -267,14 +278,20 @@ export class DatabaseService {
       run_script: data.run_script ?? null,
       archive_script: data.archive_script ?? null,
       auto_assign_port: false,
+      default_agent_sdk: null,
+      default_model_provider_id: null,
+      default_model_id: null,
+      default_model_variant: null,
+      env_vars: null,
+      sdk_configs: null,
       sort_order: 0,
       created_at: now,
       last_accessed_at: now
     }
 
     db.prepare(
-      `INSERT INTO projects (id, name, path, description, tags, language, setup_script, run_script, archive_script, auto_assign_port, sort_order, created_at, last_accessed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO projects (id, name, path, description, tags, language, setup_script, run_script, archive_script, auto_assign_port, default_agent_sdk, default_model_provider_id, default_model_id, default_model_variant, env_vars, sdk_configs, sort_order, created_at, last_accessed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       project.id,
       project.name,
@@ -286,6 +303,12 @@ export class DatabaseService {
       project.run_script,
       project.archive_script,
       project.auto_assign_port ? 1 : 0,
+      project.default_agent_sdk,
+      project.default_model_provider_id,
+      project.default_model_id,
+      project.default_model_variant,
+      project.env_vars,
+      project.sdk_configs,
       project.sort_order,
       project.created_at,
       project.last_accessed_at
@@ -400,6 +423,30 @@ export class DatabaseService {
     if (data.auto_assign_port !== undefined) {
       updates.push('auto_assign_port = ?')
       values.push(data.auto_assign_port ? 1 : 0)
+    }
+    if (data.default_agent_sdk !== undefined) {
+      updates.push('default_agent_sdk = ?')
+      values.push(data.default_agent_sdk)
+    }
+    if (data.default_model_provider_id !== undefined) {
+      updates.push('default_model_provider_id = ?')
+      values.push(data.default_model_provider_id)
+    }
+    if (data.default_model_id !== undefined) {
+      updates.push('default_model_id = ?')
+      values.push(data.default_model_id)
+    }
+    if (data.default_model_variant !== undefined) {
+      updates.push('default_model_variant = ?')
+      values.push(data.default_model_variant)
+    }
+    if (data.env_vars !== undefined) {
+      updates.push('env_vars = ?')
+      values.push(data.env_vars)
+    }
+    if (data.sdk_configs !== undefined) {
+      updates.push('sdk_configs = ?')
+      values.push(data.sdk_configs)
     }
     if (data.last_accessed_at !== undefined) {
       updates.push('last_accessed_at = ?')
@@ -584,6 +631,30 @@ export class DatabaseService {
     if (data.pinned !== undefined) {
       updates.push('pinned = ?')
       values.push(data.pinned)
+    }
+    if (data.default_model_provider_id !== undefined) {
+      updates.push('default_model_provider_id = ?')
+      values.push(data.default_model_provider_id)
+    }
+    if (data.default_model_id !== undefined) {
+      updates.push('default_model_id = ?')
+      values.push(data.default_model_id)
+    }
+    if (data.default_model_variant !== undefined) {
+      updates.push('default_model_variant = ?')
+      values.push(data.default_model_variant)
+    }
+    if (data.env_vars !== undefined) {
+      updates.push('env_vars = ?')
+      values.push(data.env_vars)
+    }
+    if (data.default_agent_sdk !== undefined) {
+      updates.push('default_agent_sdk = ?')
+      values.push(data.default_agent_sdk)
+    }
+    if (data.sdk_configs !== undefined) {
+      updates.push('sdk_configs = ?')
+      values.push(data.sdk_configs)
     }
     if (data.last_accessed_at !== undefined) {
       updates.push('last_accessed_at = ?')

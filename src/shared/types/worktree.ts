@@ -12,6 +12,12 @@ export interface Worktree {
   last_model_provider_id: string | null
   last_model_id: string | null
   last_model_variant: string | null
+  default_model_provider_id: string | null
+  default_model_id: string | null
+  default_model_variant: string | null
+  env_vars: string | null
+  default_agent_sdk: string | null
+  sdk_configs: string | null
   created_at: string
   last_accessed_at: string
 }

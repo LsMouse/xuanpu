@@ -13,8 +13,13 @@ export interface AgentSdkCapabilities {
   supportsPartialStreaming: boolean
 }
 
+export interface ConnectOptions {
+  env?: Record<string, string>
+}
+
 export interface PromptOptions {
   codexFastMode?: boolean
+  env?: Record<string, string>
 }
 
 export interface AgentSdkImplementer {
@@ -22,7 +27,7 @@ export interface AgentSdkImplementer {
   readonly capabilities: AgentSdkCapabilities
 
   // Lifecycle
-  connect(worktreePath: string, hiveSessionId: string): Promise<{ sessionId: string }>
+  connect(worktreePath: string, hiveSessionId: string, options?: ConnectOptions): Promise<{ sessionId: string }>
   reconnect(
     worktreePath: string,
     agentSessionId: string,

@@ -7,8 +7,29 @@ import type { AgentSdkManager } from '../services/agent-sdk-manager'
 import type { PromptOptions } from '../services/agent-sdk-types'
 import { ClaudeCodeImplementer } from '../services/claude-code-implementer'
 import { CodexImplementer } from '../services/codex-implementer'
+import { mergeEnvVars } from '../services/env-merge'
+import { writeSdkConfigs } from '../services/sdk-config-writer'
 
 const log = createLogger({ component: 'OpenCodeHandlers' })
+
+/**
+ * Look up project + worktree env var overrides from DB.
+ * Returns undefined when there are no overrides (avoids unnecessary object creation).
+ */
+function resolveEnvOverrides(
+  dbService: DatabaseService,
+  worktreePath: string
+): Record<string, string> | undefined {
+  try {
+    const worktree = dbService.getWorktreeByPath(worktreePath)
+    if (!worktree) return undefined
+    const project = dbService.getProject(worktree.project_id)
+    const envOverrides = mergeEnvVars(project?.env_vars ?? null, worktree.env_vars ?? null)
+    return Object.keys(envOverrides).length > 0 ? envOverrides : undefined
+  } catch {
+    return undefined
+  }
+}
 
 // Track worktree paths that have already received context injection for their
 // current session. We key by worktreePath (not opencodeSessionId) because
@@ -40,9 +61,24 @@ export function registerOpenCodeHandlers(
           if (session?.agent_sdk === 'terminal') {
             return { success: true, sessionId: hiveSessionId }
           }
+          // Write SDK-specific config files (e.g. .claude/settings.local.json) before connect
+          try {
+            const wt = dbService.getWorktreeByPath(worktreePath)
+            if (wt) {
+              const proj = dbService.getProject(wt.project_id)
+              await writeSdkConfigs(
+                worktreePath,
+                proj?.sdk_configs ?? null,
+                wt.sdk_configs ?? null
+              )
+            }
+          } catch (err) {
+            log.warn('Failed to write SDK configs before connect', { error: err })
+          }
           if (session?.agent_sdk && session.agent_sdk !== 'opencode') {
             const impl = sdkManager.getImplementer(session.agent_sdk)
-            const result = await impl.connect(worktreePath, hiveSessionId)
+            const customEnv = resolveEnvOverrides(dbService, worktreePath)
+            const result = await impl.connect(worktreePath, hiveSessionId, { env: customEnv })
             telemetryService.track('session_started', { agent_sdk: session.agent_sdk })
             return { success: true, ...result }
           }
@@ -220,7 +256,11 @@ export function registerOpenCodeHandlers(
         const sdkId = dbService.getAgentSdkForSession(opencodeSessionId)
         if (sdkId && sdkId !== 'opencode' && sdkId !== 'terminal') {
           const impl = sdkManager.getImplementer(sdkId)
-          await impl.prompt(worktreePath, opencodeSessionId, messageOrParts, model, options)
+          // Inject project/worktree env vars into prompt options
+          const customEnv = resolveEnvOverrides(dbService, worktreePath)
+          const mergedOptions: PromptOptions = { ...options }
+          if (customEnv) mergedOptions.env = customEnv
+          await impl.prompt(worktreePath, opencodeSessionId, messageOrParts, model, mergedOptions)
           telemetryService.track('prompt_sent', { agent_sdk: sdkId })
           return { success: true }
         }

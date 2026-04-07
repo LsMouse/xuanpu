@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { createLogger } from './logger'
 import { notificationService } from './notification-service'
 import { loadClaudeSDK } from './claude-sdk-loader'
-import type { AgentSdkCapabilities, AgentSdkImplementer } from './agent-sdk-types'
+import type { AgentSdkCapabilities, AgentSdkImplementer, ConnectOptions } from './agent-sdk-types'
 import { CLAUDE_CODE_CAPABILITIES } from './agent-sdk-types'
 import type { DatabaseService } from '../db/database'
 import { readClaudeTranscript, translateEntry } from './claude-transcript-reader'
@@ -122,6 +122,8 @@ export interface ClaudeSessionState {
   titleDeferred: boolean
   /** Accumulated stderr output from the Claude Code process for the current prompt */
   stderrBuffer: string[]
+  /** Custom env vars from per-project/worktree configuration */
+  customEnv?: Record<string, string>
 }
 
 export class ClaudeCodeImplementer implements AgentSdkImplementer {
@@ -189,7 +191,7 @@ export class ClaudeCodeImplementer implements AgentSdkImplementer {
 
   // ── Lifecycle ────────────────────────────────────────────────────
 
-  async connect(worktreePath: string, hiveSessionId: string): Promise<{ sessionId: string }> {
+  async connect(worktreePath: string, hiveSessionId: string, options?: ConnectOptions): Promise<{ sessionId: string }> {
     const placeholderId = `pending::${randomUUID()}`
 
     const key = this.getSessionKey(worktreePath, placeholderId)
@@ -213,7 +215,8 @@ export class ClaudeCodeImplementer implements AgentSdkImplementer {
       pendingFork: false,
       pendingResumeSessionAt: null,
       titleDeferred: false,
-      stderrBuffer: []
+      stderrBuffer: [],
+      customEnv: options?.env
     }
     this.sessions.set(key, state)
 
@@ -536,6 +539,7 @@ export class ClaudeCodeImplementer implements AgentSdkImplementer {
         debugFile: join(getActiveAppHomeDir(app.getPath('home')), 'logs', 'claude-debug.log'),
         env: {
           ...process.env,
+          ...(session.customEnv ?? {}),
           CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1'
         },
         stderr: (data: string) => {
@@ -2989,6 +2993,7 @@ export class ClaudeCodeImplementer implements AgentSdkImplementer {
         maxTurns: 1,
         env: {
           ...process.env,
+          ...(session.customEnv ?? {}),
           CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1'
         },
         ...(this.claudeBinaryPath ? { pathToClaudeCodeExecutable: this.claudeBinaryPath } : {})
