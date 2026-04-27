@@ -1464,6 +1464,9 @@ declare global {
       startTunnel: () => Promise<{ success: boolean; tunnel: HubTunnelStatus }>
       stopTunnel: () => Promise<{ success: boolean }>
       setAuthMode: (mode: HubAuthMode) => Promise<{ success: boolean }>
+      setListenHost: (
+        host: HubListenHost
+      ) => Promise<{ success: boolean; status?: HubStatusSnapshot; error?: string }>
       getCfAccessEmails: () => Promise<{ emails: string[] }>
       setCfAccessEmails: (emails: string[]) => Promise<{ success: boolean }>
       setRequireDesktopConfirm: (value: boolean) => Promise<{ success: boolean }>
@@ -1606,6 +1609,7 @@ declare global {
   }
 
   type HubAuthMode = 'password' | 'cf_access' | 'hybrid'
+  type HubListenHost = '127.0.0.1' | '0.0.0.0'
 
   type HubTunnelStatus =
     | { state: 'stopped' }
@@ -1618,9 +1622,12 @@ declare global {
     port: number | null
     host: string | null
     authMode: HubAuthMode
+    listenHost: HubListenHost
+    enabledOnStartup: boolean
     requireDesktopConfirm: boolean
     tunnel: HubTunnelStatus
     hasAdmin: boolean
+    lanAddresses: string[]
     setupKey: string | null
   }
 

@@ -819,6 +819,11 @@ app.whenReady().then(async () => {
     registerAgentHandlers(hubController.wrappedWindow, runtimeManager, databaseService)
     log.info('Registering Hub handlers')
     registerHubHandlers(mainWindow, hubController)
+    hubController.restoreStartupState().catch((err) => {
+      log.warn('failed to restore hub startup state', {
+        error: err instanceof Error ? err.message : String(err)
+      })
+    })
     log.info('Registering Timeline handlers')
     registerTimelineHandlers(runtimeManager)
     log.info('Registering FileTree handlers')
@@ -918,7 +923,7 @@ app.on('will-quit', async () => {
   try {
     const { getHubController } = await import('./services/hub/hub-controller')
     const ctrl = getHubController()
-    if (ctrl) await ctrl.stop()
+    if (ctrl) await ctrl.shutdown()
   } catch (err) {
     log.warn('hub cleanup failed', {
       error: err instanceof Error ? err.message : String(err)
