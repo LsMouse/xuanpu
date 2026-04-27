@@ -15,7 +15,7 @@ import type {
   HubStatusSnapshot,
   PendingConfirmation
 } from '../services/hub/hub-controller'
-import type { HubAuthMode } from '../services/hub/hub-server'
+import type { HubAuthMode, HubListenHost } from '../services/hub/hub-server'
 import { genToken, hashToken, tokenPrefix } from '../services/hub/hub-auth'
 import { getDatabase } from '../db/database'
 
@@ -28,6 +28,7 @@ export const HUB_CHANNELS = {
   tunnelStart: 'hub:tunnel:start',
   tunnelStop: 'hub:tunnel:stop',
   setAuthMode: 'hub:setAuthMode',
+  setListenHost: 'hub:setListenHost',
   setCfAccessEmails: 'hub:setCfAccessEmails',
   setRequireDesktopConfirm: 'hub:setRequireDesktopConfirm',
   createUser: 'hub:createUser',
@@ -99,6 +100,14 @@ export function registerHubHandlers(
     (_e, mode: HubAuthMode) => {
       controller.setAuthMode(mode)
       return { success: true }
+    }
+  )
+
+  ipcMain.handle(
+    HUB_CHANNELS.setListenHost,
+    async (_e, host: HubListenHost) => {
+      await controller.setListenHost(host)
+      return { success: true, status: controller.getStatus() }
     }
   )
 

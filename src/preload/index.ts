@@ -2003,6 +2003,8 @@ const hubOps = {
   stopTunnel: () => ipcRenderer.invoke('hub:tunnel:stop'),
   setAuthMode: (mode: 'password' | 'cf_access' | 'hybrid') =>
     ipcRenderer.invoke('hub:setAuthMode', mode),
+  setListenHost: (host: '127.0.0.1' | '0.0.0.0') =>
+    ipcRenderer.invoke('hub:setListenHost', host),
   getCfAccessEmails: () => ipcRenderer.invoke('hub:getCfAccessEmails'),
   setCfAccessEmails: (emails: string[]) => ipcRenderer.invoke('hub:setCfAccessEmails', emails),
   setRequireDesktopConfirm: (value: boolean) =>

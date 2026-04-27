@@ -46,6 +46,34 @@ const AUTH_MODE_OPTIONS: Array<{
   }
 ]
 
+const LISTEN_HOST_OPTIONS: Array<{
+  value: HubListenHost
+  label: string
+  description: string
+}> = [
+  {
+    value: '127.0.0.1',
+    label: '仅本机 (127.0.0.1)',
+    description: '最安全，只允许本机浏览器和 Cloudflare 隧道访问。'
+  },
+  {
+    value: '0.0.0.0',
+    label: '局域网 (0.0.0.0)',
+    description: '允许同一 Wi-Fi / 局域网设备直接访问，需要确保密码足够强。'
+  }
+]
+
+function formatHostForUrl(host: string): string {
+  return host.includes(':') && !host.startsWith('[') ? `[${host}]` : host
+}
+
+function displayHostForStatus(status: HubStatusSnapshot): string {
+  if (status.listenHost === '0.0.0.0') {
+    return status.lanAddresses[0] ?? '0.0.0.0'
+  }
+  return status.host ?? '127.0.0.1'
+}
+
 export function HubSection(): React.JSX.Element {
   const { status, cfAccessEmails, loading, init } = useHubStore()
 
@@ -62,8 +90,8 @@ export function HubSection(): React.JSX.Element {
       <header>
         <h2 className="text-lg font-semibold">远程访问 (Hub)</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          在本机开启 Hub 服务，让手机或平板远程查看与控制你的 Claude Code 会话。
-          公网访问通过 Cloudflare 临时隧道实现。
+          在本机开启 Hub 服务，让手机或平板远程查看与控制你的 Claude Code 会话。 公网访问通过
+          Cloudflare 临时隧道实现。
         </p>
       </header>
 
@@ -75,11 +103,7 @@ export function HubSection(): React.JSX.Element {
 
       <TunnelCard status={status} loading={loading} />
 
-      <AuthModeCard
-        currentMode={status.authMode}
-        emails={cfAccessEmails}
-        loading={loading}
-      />
+      <AuthModeCard currentMode={status.authMode} emails={cfAccessEmails} loading={loading} />
 
       <SecurityCard status={status} loading={loading} />
     </div>
@@ -111,8 +135,8 @@ function SetupCard({
   return (
     <Card title="首次设置" icon={<KeyRound className="h-4 w-4" />}>
       <p className="text-sm text-muted-foreground">
-        Hub 还没有管理员账号。请使用下面的一次性 Setup Key 创建第一个管理员。
-        创建后此 Key 会立即失效。
+        Hub 还没有管理员账号。请使用下面的一次性 Setup Key 创建第一个管理员。 创建后此 Key
+        会立即失效。
       </p>
       <div className="flex items-center gap-2 mt-3 mb-4">
         <code className="flex-1 px-3 py-2 bg-muted rounded text-sm font-mono select-all">
@@ -162,9 +186,13 @@ function HubSwitchCard({
 }): React.JSX.Element {
   const start = useHubStore((s) => s.start)
   const stop = useHubStore((s) => s.stop)
+  const setListenHost = useHubStore((s) => s.setListenHost)
 
+  const displayHost = displayHostForStatus(status)
   const url =
-    status.enabled && status.port ? `http://${status.host ?? '127.0.0.1'}:${status.port}` : null
+    status.enabled && status.port ? `http://${formatHostForUrl(displayHost)}:${status.port}` : null
+  const previewHost = status.listenHost === '0.0.0.0' ? displayHost : '127.0.0.1'
+  const previewUrl = `http://${formatHostForUrl(previewHost)}:8317`
 
   return (
     <Card
@@ -190,18 +218,57 @@ function HubSwitchCard({
       {status.hasAdmin ? (
         <>
           {status.enabled && url ? (
-            <div className="flex items-center gap-2 mt-1">
-              <code className="flex-1 px-3 py-2 bg-muted rounded text-sm font-mono">
-                {url}
-              </code>
-              <CopyButton value={url} />
-              <QrButton value={url} label="同 Wi-Fi 下扫码" />
-            </div>
+            <>
+              <div className="flex items-center gap-2 mt-1">
+                <code className="flex-1 px-3 py-2 bg-muted rounded text-sm font-mono">{url}</code>
+                <CopyButton value={url} />
+                <QrButton
+                  value={url}
+                  label={status.listenHost === '0.0.0.0' ? '同 Wi-Fi 下扫码' : '本机访问'}
+                />
+              </div>
+              {status.listenHost === '0.0.0.0' && status.lanAddresses.length > 1 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  其他局域网地址：{status.lanAddresses.slice(1).join('、')}
+                </p>
+              )}
+            </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              开启后将在 {`http://127.0.0.1:8317`} 上监听本机请求。
+              开启后将在 {previewUrl} 上监听请求；开关状态会在下次启动时恢复。
             </p>
           )}
+          <div className="border-t border-border my-4" />
+          <div className="space-y-2">
+            <p className="text-sm font-medium">监听地址</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {LISTEN_HOST_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  data-testid={`hub-listen-host-${opt.value}`}
+                  disabled={loading}
+                  onClick={() => setListenHost(opt.value)}
+                  className={cn(
+                    'text-left px-3 py-2 rounded-md border transition-colors',
+                    status.listenHost === opt.value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:bg-accent/50'
+                  )}
+                >
+                  <span className="text-sm font-medium">{opt.label}</span>
+                  <span className="block text-xs text-muted-foreground mt-1">
+                    {opt.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {status.listenHost === '0.0.0.0' && (
+              <p className="text-xs text-amber-500">
+                ⚠ 局域网内任何能访问该地址的人都可以尝试登录。请使用强密码，并仅在受信任网络开启。
+              </p>
+            )}
+          </div>
         </>
       ) : (
         <p className="text-sm text-muted-foreground">请先完成上方的首次设置。</p>
@@ -240,9 +307,7 @@ function TunnelCard({
         />
       }
     >
-      {!status.enabled && (
-        <p className="text-sm text-muted-foreground">请先开启本机服务。</p>
-      )}
+      {!status.enabled && <p className="text-sm text-muted-foreground">请先开启本机服务。</p>}
       {status.enabled && (
         <>
           <TunnelStatusLine status={status.tunnel} />
@@ -274,11 +339,7 @@ function TunnelStatusLine({ status }: { status: HubTunnelStatus }): React.JSX.El
     case 'running':
       return <p className="text-sm text-green-500">已连接</p>
     case 'error':
-      return (
-        <p className="text-sm text-red-500">
-          错误：{status.message}
-        </p>
-      )
+      return <p className="text-sm text-red-500">错误：{status.message}</p>
   }
 }
 
@@ -420,7 +481,9 @@ function SecurityCard({
             收到手机端发起的 prompt 时，桌面端会弹出 Toast 让你批准。
             {tunnelOpen && !status.requireDesktopConfirm && (
               <span className="text-amber-500">
-                {' '}公网已开启且二次确认关闭——任何拿到隧道 URL 并登录成功的人都能直接驱动 agent，务必配合鉴权模式（Cloudflare Access 或强密码）。
+                {' '}
+                公网已开启且二次确认关闭——任何拿到隧道 URL 并登录成功的人都能直接驱动
+                agent，务必配合鉴权模式（Cloudflare Access 或强密码）。
               </span>
             )}
             {tunnelOpen && status.requireDesktopConfirm && (
@@ -536,9 +599,7 @@ function QrButton({ value, label }: { value: string; label?: string }): React.JS
           <p className="max-w-[12rem] break-all text-center text-[11px] text-muted-foreground font-mono">
             {value}
           </p>
-          {label ? (
-            <p className="text-[11px] text-muted-foreground">{label}</p>
-          ) : null}
+          {label ? <p className="text-[11px] text-muted-foreground">{label}</p> : null}
         </div>
       </PopoverContent>
     </Popover>

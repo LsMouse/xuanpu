@@ -37,11 +37,18 @@ import { HubRegistry } from './hub-registry'
 import {
   createHubServer,
   DEFAULT_HUB_PORT,
+  getHubEnabled,
+  getHubLanAddresses,
+  getHubListenHost,
+  normalizeHubListenHost,
   setHubAuthMode,
   setHubCfAccessEmails,
+  setHubEnabled,
+  setHubListenHost,
   setHubRequireDesktopConfirm,
   setHubTunnelUrl,
   type HubAuthMode,
+  type HubListenHost,
   type HubServer,
   type HubServerStatus
 } from './hub-server'
@@ -77,9 +84,12 @@ export interface HubStatusSnapshot {
   port: number | null
   host: string | null
   authMode: HubAuthMode
+  listenHost: HubListenHost
+  enabledOnStartup: boolean
   requireDesktopConfirm: boolean
   tunnel: TunnelStatus
   hasAdmin: boolean
+  lanAddresses: string[]
   /** Only set when no admin exists yet. */
   setupKey: string | null
 }
@@ -191,14 +201,39 @@ export class HubController extends EventEmitter {
   }
 
   async start(): Promise<HubServerStatus> {
-    const status = await this.server.start(this.defaultPort)
+    const db = getDatabase().getDb()
+    const status = await this.server.start(this.defaultPort, getHubListenHost(db))
+    setHubEnabled(db, true)
     this.emit('status', this.getStatus())
     return status
   }
 
-  async stop(): Promise<void> {
+  async stop(options: { persistEnabled?: boolean } = {}): Promise<void> {
     await this.tunnel.stop()
     await this.server.stop()
+    if (options.persistEnabled !== false) {
+      setHubEnabled(getDatabase().getDb(), false)
+    }
+    this.emit('status', this.getStatus())
+  }
+
+  async shutdown(): Promise<void> {
+    await this.stop({ persistEnabled: false })
+  }
+
+  async restoreStartupState(): Promise<void> {
+    const db = getDatabase().getDb()
+    if (!getHubEnabled(db)) {
+      this.emit('status', this.getStatus())
+      return
+    }
+    try {
+      await this.server.start(this.defaultPort, getHubListenHost(db))
+    } catch (err) {
+      log.warn('failed to restore hub startup state', {
+        error: err instanceof Error ? err.message : String(err)
+      })
+    }
     this.emit('status', this.getStatus())
   }
 
@@ -217,8 +252,7 @@ export class HubController extends EventEmitter {
 
   getStatus(): HubStatusSnapshot {
     const db = getDatabase().getDb()
-    const adminCount = (db.prepare('SELECT COUNT(*) as n FROM hub_users').get() as { n: number })
-      .n
+    const adminCount = (db.prepare('SELECT COUNT(*) as n FROM hub_users').get() as { n: number }).n
     const hasAdmin = adminCount > 0
     const setupKey = hasAdmin ? null : this.server.ensureSetupKey()
     const setting = (key: string): string | null => {
@@ -229,15 +263,20 @@ export class HubController extends EventEmitter {
     }
     const authMode = (setting('auth_mode') as HubAuthMode | null) ?? 'password'
     const requireDesktopConfirm = setting('require_desktop_confirm') !== '0'
+    const listenHost = getHubListenHost(db)
+    const enabledOnStartup = getHubEnabled(db)
     const serverStatus = this.server.status()
     return {
       enabled: serverStatus.running,
       port: serverStatus.port,
       host: serverStatus.host,
       authMode,
+      listenHost,
+      enabledOnStartup,
       requireDesktopConfirm,
       tunnel: this.currentTunnel,
       hasAdmin,
+      lanAddresses: getHubLanAddresses(),
       setupKey
     }
   }
@@ -259,6 +298,27 @@ export class HubController extends EventEmitter {
     this.emit('status', this.getStatus())
   }
 
+  async setListenHost(host: HubListenHost): Promise<void> {
+    const db = getDatabase().getDb()
+    const current = getHubListenHost(db)
+    const nextHost = normalizeHubListenHost(host)
+    setHubListenHost(db, nextHost)
+    if (current === nextHost || !this.server.status().running) {
+      this.emit('status', this.getStatus())
+      return
+    }
+
+    const tunnelWasRunning = this.currentTunnel.state === 'running'
+    await this.tunnel.stop()
+    await this.server.stop()
+    await this.server.start(this.defaultPort, nextHost)
+    if (tunnelWasRunning) {
+      const status = this.server.status()
+      if (status.port !== null) this.tunnel.start(status.port)
+    }
+    this.emit('status', this.getStatus())
+  }
+
   // ─── users ────────────────────────────────────────────────────────────────
 
   async createInitialAdmin(input: {
@@ -267,8 +327,7 @@ export class HubController extends EventEmitter {
     password: string
   }): Promise<{ success: boolean; error?: string }> {
     const db = getDatabase().getDb()
-    const adminCount = (db.prepare('SELECT COUNT(*) as n FROM hub_users').get() as { n: number })
-      .n
+    const adminCount = (db.prepare('SELECT COUNT(*) as n FROM hub_users').get() as { n: number }).n
     if (adminCount > 0) return { success: false, error: 'admin already exists' }
     const expected = this.server.ensureSetupKey()
     if (!expected || input.setupKey !== expected) {
@@ -280,9 +339,11 @@ export class HubController extends EventEmitter {
     }
     try {
       const hash = await hashPassword(input.password)
-      db.prepare(
-        'INSERT INTO hub_users(username, password_hash, created_at) VALUES(?, ?, ?)'
-      ).run(username, hash, Date.now())
+      db.prepare('INSERT INTO hub_users(username, password_hash, created_at) VALUES(?, ?, ?)').run(
+        username,
+        hash,
+        Date.now()
+      )
       this.emit('status', this.getStatus())
       return { success: true }
     } catch (err) {
