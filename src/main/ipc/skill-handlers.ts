@@ -154,7 +154,7 @@ export function registerSkillHandlers(): void {
     success: true
     availability: ProviderAvailability
   }> => {
-    const raw = detectAgentSdks()
+    const raw = await detectAgentSdks()
     return {
       success: true,
       availability: {
