@@ -17,8 +17,11 @@ const DEFAULT_STATUS: HubStatusSnapshot = {
   port: null,
   host: null,
   authMode: 'password',
+  listenHost: '127.0.0.1',
+  enabledOnStartup: false,
   tunnel: { state: 'stopped' },
   hasAdmin: false,
+  lanAddresses: [],
   setupKey: null
 }
 
@@ -39,6 +42,7 @@ interface HubStoreState {
   startTunnel: () => Promise<boolean>
   stopTunnel: () => Promise<boolean>
   setAuthMode: (mode: HubAuthMode) => Promise<boolean>
+  setListenHost: (host: HubListenHost) => Promise<boolean>
   setCfAccessEmails: (emails: string[]) => Promise<boolean>
   createUser: (args: {
     setupKey: string
@@ -56,10 +60,7 @@ export const useHubStore = create<HubStoreState>((set, get) => {
   let initialized = false
   let unsubscribers: Array<() => void> = []
 
-  const wrap = async <T>(
-    fn: () => Promise<T>,
-    errLabel: string
-  ): Promise<T | null> => {
+  const wrap = async <T>(fn: () => Promise<T>, errLabel: string): Promise<T | null> => {
     set({ loading: true })
     try {
       return await fn()
@@ -134,8 +135,7 @@ export const useHubStore = create<HubStoreState>((set, get) => {
       const result = await wrap(() => window.hubOps.startTunnel(), '开启公网访问失败')
       if (!result) return false
       if (!result.success) {
-        const msg =
-          result.tunnel.state === 'error' ? result.tunnel.message : '开启失败'
+        const msg = result.tunnel.state === 'error' ? result.tunnel.message : '开启失败'
         toast.error(msg)
         return false
       }
@@ -155,11 +155,16 @@ export const useHubStore = create<HubStoreState>((set, get) => {
       return true
     },
 
+    setListenHost: async (host) => {
+      const result = await wrap(() => window.hubOps.setListenHost(host), '修改监听地址失败')
+      if (!result?.success) return false
+      if (result.status) set({ status: result.status })
+      else set((s) => ({ status: { ...s.status, listenHost: host } }))
+      return true
+    },
+
     setCfAccessEmails: async (emails) => {
-      const result = await wrap(
-        () => window.hubOps.setCfAccessEmails(emails),
-        '保存邮箱白名单失败'
-      )
+      const result = await wrap(() => window.hubOps.setCfAccessEmails(emails), '保存邮箱白名单失败')
       if (!result?.success) return false
       set({ cfAccessEmails: emails })
       return true

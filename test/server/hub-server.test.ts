@@ -14,8 +14,12 @@ import type { AddressInfo } from 'net'
 import {
   createHubServer,
   COOKIE_NAME,
+  getHubEnabled,
+  getHubListenHost,
   setHubAuthMode,
   setHubCfAccessEmails,
+  setHubEnabled,
+  setHubListenHost,
   setHubTunnelUrl
 } from '../../src/main/services/hub/hub-server'
 import { HubRegistry } from '../../src/main/services/hub/hub-registry'
@@ -58,7 +62,11 @@ function makeDb(): Database.Database {
       id TEXT PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL
     );
     CREATE TABLE worktrees (
-      id TEXT PRIMARY KEY, project_id TEXT NOT NULL, name TEXT NOT NULL, path TEXT NOT NULL
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      path TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active'
     );
     CREATE TABLE sessions (
       id TEXT PRIMARY KEY,
@@ -95,9 +103,7 @@ interface TestCtx {
   baseUrl: string
 }
 
-async function boot(
-  overrides: { rateLimiter?: LoginRateLimiter } = {}
-): Promise<TestCtx> {
+async function boot(overrides: { rateLimiter?: LoginRateLimiter } = {}): Promise<TestCtx> {
   const db = makeDb()
   const registry = new HubRegistry({ localDeviceId: 'dev-local', localDeviceName: 'laptop' })
   const server = createHubServer({
@@ -115,7 +121,9 @@ async function boot(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const httpServer = (server as any).httpServer as import('http').Server | null
   const addr = httpServer?.address() as AddressInfo | null
-  if (!addr) throw new Error('no address')
+  if (!addr) {
+    throw new Error('no address')
+  }
   // Overwrite boundPort so allowedOrigins() uses the real port.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(server as any).boundPort = addr.port
@@ -353,9 +361,7 @@ describe('hub-server: protected routes', () => {
   })
 
   it('/api/devices/:id/sessions lists active sessions from DB', async () => {
-    ctx.db
-      .prepare('INSERT INTO projects(id,name,path) VALUES(?,?,?)')
-      .run('p1', 'proj', '/p')
+    ctx.db.prepare('INSERT INTO projects(id,name,path) VALUES(?,?,?)').run('p1', 'proj', '/p')
     ctx.db
       .prepare('INSERT INTO worktrees(id,project_id,name,path) VALUES(?,?,?,?)')
       .run('w1', 'p1', 'wt', '/p/wt')
@@ -498,6 +504,50 @@ describe('hub-server: origin check', () => {
 })
 
 describe('hub-server: unknown routes + lifecycle', () => {
+  it('persists enabled state and listen host settings', () => {
+    const db = makeDb()
+    const registry = new HubRegistry({ localDeviceId: 'dev-local', localDeviceName: 'laptop' })
+    ctx = {
+      db,
+      registry,
+      server: createHubServer({ db, registry }),
+      baseUrl: ''
+    }
+
+    expect(getHubEnabled(db)).toBe(false)
+    expect(getHubListenHost(db)).toBe('127.0.0.1')
+
+    setHubEnabled(db, true)
+    setHubListenHost(db, '0.0.0.0')
+
+    expect(getHubEnabled(db)).toBe(true)
+    expect(getHubListenHost(db)).toBe('0.0.0.0')
+  })
+
+  it('start() can explicitly bind loopback', async () => {
+    const db = makeDb()
+    const registry = new HubRegistry({ localDeviceId: 'dev-local', localDeviceName: 'laptop' })
+    const server = createHubServer({ db, registry })
+    ctx = { db, registry, server, baseUrl: '' }
+
+    const status = await server.start(0, '127.0.0.1')
+
+    expect(status.running).toBe(true)
+    expect(status.host).toBe('127.0.0.1')
+  })
+
+  it('start() can explicitly bind all interfaces for LAN access', async () => {
+    const db = makeDb()
+    const registry = new HubRegistry({ localDeviceId: 'dev-local', localDeviceName: 'laptop' })
+    const server = createHubServer({ db, registry })
+    ctx = { db, registry, server, baseUrl: '' }
+
+    const status = await server.start(0, '0.0.0.0')
+
+    expect(status.running).toBe(true)
+    expect(status.host).toBe('0.0.0.0')
+  })
+
   it('unknown path returns 404 JSON', async () => {
     ctx = await boot()
     const r = await req(`${ctx.baseUrl}/does/not/exist`)

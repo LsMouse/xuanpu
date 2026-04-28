@@ -29,8 +29,11 @@ import {
   registerTimelineHandlers,
   registerSkillHandlers,
   registerHubHandlers,
-  registerFieldHandlers
+  registerFieldHandlers,
+  registerModelProfileHandlers
 } from './ipc'
+import { setCodexImplementer } from './ipc/model-profile-handlers'
+import { setCodexImplementerForDbHandlers } from './ipc/database-handlers'
 import { buildMenu, updateMenuState } from './menu'
 import type { MenuState } from './menu'
 import { createLogger, getLogDir } from './services/logger'
@@ -749,6 +752,7 @@ app.whenReady().then(async () => {
   // getSemanticMemory / getCheckpoint + the renderer-side reportXxx events
   // that the FieldContextDebug panel and others depend on.
   registerFieldHandlers()
+  registerModelProfileHandlers()
 
   // Telemetry IPC
   ipcMain.handle(
@@ -792,6 +796,8 @@ app.whenReady().then(async () => {
     claudeImpl.setClaudeBinaryPath(claudeBinaryPath)
     const codexImpl = new CodexImplementer()
     codexImpl.setDatabaseService(getDatabase())
+    setCodexImplementer(codexImpl)
+    setCodexImplementerForDbHandlers(codexImpl)
 
     // Create the canonical runtime manager
     const runtimeManager = new AgentRuntimeManager([openCodeService, claudeImpl, codexImpl])
@@ -813,6 +819,11 @@ app.whenReady().then(async () => {
     registerAgentHandlers(hubController.wrappedWindow, runtimeManager, databaseService)
     log.info('Registering Hub handlers')
     registerHubHandlers(mainWindow, hubController)
+    hubController.restoreStartupState().catch((err) => {
+      log.warn('failed to restore hub startup state', {
+        error: err instanceof Error ? err.message : String(err)
+      })
+    })
     log.info('Registering Timeline handlers')
     registerTimelineHandlers(runtimeManager)
     log.info('Registering FileTree handlers')
@@ -912,7 +923,7 @@ app.on('will-quit', async () => {
   try {
     const { getHubController } = await import('./services/hub/hub-controller')
     const ctrl = getHubController()
-    if (ctrl) await ctrl.stop()
+    if (ctrl) await ctrl.shutdown()
   } catch (err) {
     log.warn('hub cleanup failed', {
       error: err instanceof Error ? err.message : String(err)

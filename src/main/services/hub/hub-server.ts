@@ -1,8 +1,8 @@
 /**
  * hub-server: node:http + ws.WebSocketServer for the Xuanpu Hub (M1).
  *
- * Listens on 127.0.0.1 only (loopback). Public exposure happens by spawning
- * `cloudflared` (#39) as a child process — never by binding 0.0.0.0.
+ * Listens on 127.0.0.1 by default (loopback). Users can opt into 0.0.0.0
+ * for LAN access; public exposure still happens via `cloudflared` (#39).
  *
  * Designed to be DI-friendly so tests don't have to touch electron/app paths:
  *
@@ -44,6 +44,7 @@
 import type { Database } from 'better-sqlite3'
 import http, { type IncomingMessage, type ServerResponse } from 'http'
 import { connect as netConnect, type Socket } from 'net'
+import { networkInterfaces } from 'os'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -66,6 +67,7 @@ const log = createLogger({ component: 'HubServer' })
 export const COOKIE_NAME = 'sh_session'
 export const COOKIE_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 export const DEFAULT_HUB_PORT = 8317
+export const DEFAULT_HUB_LISTEN_HOST = '127.0.0.1'
 /**
  * How many ports past `DEFAULT_HUB_PORT` we're allowed to try before giving
  * up. Protects the host from a hub instance silently claiming a wildly
@@ -76,6 +78,7 @@ export const DEFAULT_HUB_PORT = 8317
 const PORT_FALLBACK_ATTEMPTS = 20
 
 export type HubAuthMode = 'password' | 'cf_access' | 'hybrid'
+export type HubListenHost = '127.0.0.1' | '0.0.0.0'
 
 const DEFAULT_AUTH_MODE: HubAuthMode = 'password'
 
@@ -83,7 +86,9 @@ const SETTING_KEYS = {
   authMode: 'auth_mode',
   requireDesktopConfirm: 'require_desktop_confirm',
   cfAccessEmails: 'cf_access_emails',
-  tunnelUrl: 'tunnel_url'
+  tunnelUrl: 'tunnel_url',
+  listenHost: 'listen_host',
+  enabled: 'enabled'
 } as const
 
 // ─── deps ───────────────────────────────────────────────────────────────────
@@ -118,7 +123,12 @@ interface JsonError {
   message?: string
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
+function sendJson(
+  res: ServerResponse,
+  status: number,
+  body: unknown,
+  headers: Record<string, string> = {}
+): void {
   const payload = JSON.stringify(body)
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
@@ -178,8 +188,7 @@ function clientIp(req: IncomingMessage): string {
 }
 
 function setSessionCookie(res: ServerResponse, sid: string, maxAgeMs: number): void {
-  // Loopback only — Secure/SameSite=Strict is fine; tunnel users already have
-  // the cookie set on the loopback origin during login.
+  // Lax keeps normal Hub navigation/login flows working on loopback, LAN, and tunnel origins.
   const maxAgeSecs = Math.floor(maxAgeMs / 1000)
   const value = `${COOKIE_NAME}=${encodeURIComponent(sid)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSecs}`
   res.setHeader('set-cookie', value)
@@ -237,6 +246,30 @@ function getCfAccessEmails(db: Database): string[] {
 
 function getTunnelUrl(db: Database): string | null {
   return getSetting(db, SETTING_KEYS.tunnelUrl)
+}
+
+export function normalizeHubListenHost(value: string | null): HubListenHost {
+  return value === '0.0.0.0' ? '0.0.0.0' : DEFAULT_HUB_LISTEN_HOST
+}
+
+export function getHubListenHost(db: Database): HubListenHost {
+  return normalizeHubListenHost(getSetting(db, SETTING_KEYS.listenHost))
+}
+
+export function getHubEnabled(db: Database): boolean {
+  return getSetting(db, SETTING_KEYS.enabled) === '1'
+}
+
+export function getHubLanAddresses(): string[] {
+  const addresses = new Set<string>()
+  for (const items of Object.values(networkInterfaces())) {
+    for (const item of items ?? []) {
+      if (item.family === 'IPv4' && !item.internal) {
+        addresses.add(item.address)
+      }
+    }
+  }
+  return [...addresses]
 }
 
 function getRequireDesktopConfirm(_db: Database): boolean {
@@ -333,11 +366,7 @@ interface AuthedUser {
   email?: string
 }
 
-function resolveAuth(
-  db: Database,
-  req: IncomingMessage,
-  now: number
-): AuthedUser | null {
+function resolveAuth(db: Database, req: IncomingMessage, now: number): AuthedUser | null {
   const mode = getAuthMode(db)
 
   if (mode === 'password' || mode === 'hybrid') {
@@ -365,7 +394,7 @@ function resolveAuth(
 // ─── server ─────────────────────────────────────────────────────────────────
 
 export interface HubServer {
-  start(port?: number): Promise<HubServerStatus>
+  start(port?: number, host?: HubListenHost): Promise<HubServerStatus>
   stop(): Promise<void>
   status(): HubServerStatus
   /**
@@ -419,16 +448,17 @@ class HubServerImpl implements HubServer {
     return this.setupKey
   }
 
-  async start(port: number = DEFAULT_HUB_PORT): Promise<HubServerStatus> {
+  async start(
+    port: number = DEFAULT_HUB_PORT,
+    host: HubListenHost = DEFAULT_HUB_LISTEN_HOST
+  ): Promise<HubServerStatus> {
     if (this.httpServer) return this.status()
 
     const server = http.createServer((req, res) => {
       this.handleRequest(req, res).catch((err) => {
-        log.error(
-          'unhandled request error',
-          err instanceof Error ? err : new Error(String(err)),
-          { url: req.url }
-        )
+        log.error('unhandled request error', err instanceof Error ? err : new Error(String(err)), {
+          url: req.url
+        })
         if (!res.headersSent) {
           sendError(res, { status: 500, code: 'INTERNAL', message: 'internal error' })
         } else {
@@ -445,26 +475,32 @@ class HubServerImpl implements HubServer {
     // Port conflict fallback: if the preferred port (default 8317) is already
     // taken — e.g. by a brew-installed background agent — walk forward up to
     // `PORT_FALLBACK_ATTEMPTS` ports and grab the first one that's free.
-    // Prefer IPv4 loopback; if the host has no IPv4 stack fall back to ::1
-    // for that single attempt. We persist the chosen port on `boundPort` so
-    // `/api/config`, cloudflared tunnel, and the renderer UI all agree.
-    const { host, port: boundPort } = await this.listenWithFallback(server, port)
-    this.boundHost = host
-    this.boundPort = boundPort
+    // Loopback prefers IPv4 and falls back to ::1 when no IPv4 stack exists.
+    // LAN mode binds 0.0.0.0 as requested. We persist the chosen port on
+    // `boundPort` so `/api/config`, cloudflared tunnel, and renderer UI agree.
+    const bound = await this.listenWithFallback(server, port, host)
+    this.boundHost = bound.host
+    this.boundPort = bound.port
+    const address = server.address()
+    if (address && typeof address !== 'string') {
+      this.boundPort = address.port
+    }
     this.httpServer = server
     this.wss = wss
     log.info('hub-server listening', {
       host: this.boundHost,
       port: this.boundPort,
       requestedPort: port,
-      fellBack: boundPort !== port
+      requestedHost: host,
+      fellBack: this.boundPort !== port || this.boundHost !== host
     })
     return this.status()
   }
 
   private async listenWithFallback(
     server: http.Server,
-    startPort: number
+    startPort: number,
+    requestedHost: HubListenHost
   ): Promise<{ host: string; port: number }> {
     let lastErr: unknown = null
     for (let i = 0; i < PORT_FALLBACK_ATTEMPTS; i++) {
@@ -475,16 +511,16 @@ class HubServerImpl implements HubServer {
       // depending on listen order. Detect the dual-stack collision by
       // probing both 127.0.0.1 and ::1 — if either accepts a connection,
       // walk to the next port. See: https://github.com/nodejs/node/issues/14338
-      if (await isPortInUse(port)) {
+      if (port !== 0 && (await isPortInUse(port))) {
         log.warn('hub-server: port already accepting connections, trying next', { port })
         continue
       }
       try {
-        await this.listenOn(server, port, '127.0.0.1')
-        return { host: '127.0.0.1', port }
+        await this.listenOn(server, port, requestedHost)
+        return { host: requestedHost, port }
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code
-        if (code === 'EADDRNOTAVAIL') {
+        if (requestedHost === '127.0.0.1' && code === 'EADDRNOTAVAIL') {
           // No IPv4 stack. Retry once on ::1 and return regardless — this is
           // a host-level problem, not a per-port one, so there's no point
           // walking further.
@@ -552,6 +588,12 @@ class HubServerImpl implements HubServer {
       origins.push(`http://127.0.0.1:${this.boundPort}`)
       origins.push(`http://[::1]:${this.boundPort}`)
       origins.push(`http://localhost:${this.boundPort}`)
+      if (this.boundHost === '0.0.0.0') {
+        origins.push(`http://0.0.0.0:${this.boundPort}`)
+        for (const address of getHubLanAddresses()) {
+          origins.push(`http://${address}:${this.boundPort}`)
+        }
+      }
     }
     const tunnel = getTunnelUrl(this.db)
     if (tunnel) {
@@ -764,11 +806,7 @@ class HubServerImpl implements HubServer {
     sendJson(res, 200, { devices: this.registry.listDevices() })
   }
 
-  private routeDeviceSessions(
-    req: IncomingMessage,
-    res: ServerResponse,
-    deviceId: string
-  ): void {
+  private routeDeviceSessions(req: IncomingMessage, res: ServerResponse, deviceId: string): void {
     const user = resolveAuth(this.db, req, this.now())
     if (!user) return sendError(res, { status: 401, code: 'AUTH_REQUIRED' })
     const device = this.registry.getDevice(deviceId)
@@ -811,17 +849,12 @@ class HubServerImpl implements HubServer {
         ? { id: r.worktree_id, name: r.worktree_name, path: r.worktree_path }
         : null,
       project: { id: r.project_id, name: r.project_name },
-      runtimeStatus:
-        this.registry.getSession(deviceId, r.id)?.status ?? 'idle'
+      runtimeStatus: this.registry.getSession(deviceId, r.id)?.status ?? 'idle'
     }))
     sendJson(res, 200, { device, sessions })
   }
 
-  private routeSessionHistory(
-    req: IncomingMessage,
-    res: ServerResponse,
-    hiveId: string
-  ): void {
+  private routeSessionHistory(req: IncomingMessage, res: ServerResponse, hiveId: string): void {
     const user = resolveAuth(this.db, req, this.now())
     if (!user) return sendError(res, { status: 401, code: 'AUTH_REQUIRED' })
 
@@ -1065,6 +1098,14 @@ export function setHubCfAccessEmails(db: Database, emails: readonly string[]): v
 
 export function setHubRequireDesktopConfirm(db: Database, value: boolean): void {
   setSetting(db, SETTING_KEYS.requireDesktopConfirm, value ? '1' : '0')
+}
+
+export function setHubListenHost(db: Database, host: HubListenHost): void {
+  setSetting(db, SETTING_KEYS.listenHost, normalizeHubListenHost(host))
+}
+
+export function setHubEnabled(db: Database, enabled: boolean): void {
+  setSetting(db, SETTING_KEYS.enabled, enabled ? '1' : '0')
 }
 
 export function setHubTunnelUrl(db: Database, url: string | null): void {
