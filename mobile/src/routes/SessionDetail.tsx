@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useSessionStream } from '../hooks/useSessionStream'
+import { useTerminalStream } from '../hooks/useTerminalStream'
 import { useAutoScrollToBottom } from '../hooks/useAutoScrollToBottom'
 import { useSessions } from '../stores/useSessions'
 import { MessageBubble } from '../components/MessageBubble'
@@ -11,6 +12,7 @@ import { CommandApprovalCard } from '../components/CommandApprovalCard'
 import { NoticeStrip } from '../components/NoticeStrip'
 import { PromptComposer } from '../components/PromptComposer'
 import { ErrorBoundary } from '../components/ErrorBoundary'
+import { MobileTerminalPane } from '../components/MobileTerminalPane'
 
 export function SessionDetail(): React.JSX.Element {
   const { deviceId, hiveId } = useParams<{ deviceId: string; hiveId: string }>()
@@ -29,6 +31,7 @@ function SessionDetailInner({
 }): React.JSX.Element {
   const stream = useSessionStream(deviceId, hiveId)
   const { scrollRef, atBottom, jumpToBottom, bump } = useAutoScrollToBottom()
+  const [mode, setMode] = useState<'model' | 'shell'>('model')
   const { messages, connection, status, permission, question, plan, commandApproval, notices, error } = stream.state
   const sessionMeta = useSessions((s) =>
     s.byDevice[deviceId]?.find((it) => it.hiveSessionId === hiveId)
@@ -43,6 +46,9 @@ function SessionDetailInner({
   }, [deviceId, hasSessionName, refreshSessions, sessionMeta])
 
   const headerTitle = sessionMeta?.name?.trim() || hiveId
+  const worktreeId = sessionMeta?.worktree?.id ?? null
+  const worktreePath = sessionMeta?.worktree?.path ?? null
+  const shellDisabled = !worktreeId || !worktreePath
 
   // Bump auto-scroll whenever the message list or running state changes.
   useEffect(() => {
@@ -91,53 +97,61 @@ function SessionDetailInner({
         onClearAll={stream.clearAllNotices}
       />
 
-      <div
-        ref={scrollRef}
-        className="mobile-scroll min-h-0 flex-1 overflow-y-auto px-3.5 py-4 space-y-4"
-        data-testid="message-stream"
-      >
-        {messages.length === 0 && connection === 'open' && (
-          <div className="mx-auto mt-[18dvh] max-w-[260px] rounded-[28px] border border-zinc-900 bg-zinc-950/45 px-5 py-6 text-center">
-            <p className="text-base font-medium text-zinc-300">还没有消息</p>
-            <p className="mt-2 text-sm leading-6 text-zinc-500">从手机发一条消息，桌面端 agent 会继续处理。</p>
-          </div>
-        )}
-        {messages.map((m) => (
-          <ErrorBoundary key={m.id}>
-            <MessageBubble message={m} />
-          </ErrorBoundary>
-        ))}
+      {mode === 'shell' ? (
+        <ShellModePane
+          deviceId={deviceId}
+          worktreeId={worktreeId}
+          worktreePath={worktreePath}
+        />
+      ) : (
+        <div
+          ref={scrollRef}
+          className="mobile-scroll min-h-0 flex-1 overflow-y-auto px-3.5 py-4 space-y-4"
+          data-testid="message-stream"
+        >
+          {messages.length === 0 && connection === 'open' && (
+            <div className="mx-auto mt-[18dvh] max-w-[260px] rounded-[28px] border border-zinc-900 bg-zinc-950/45 px-5 py-6 text-center">
+              <p className="text-base font-medium text-zinc-300">还没有消息</p>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">从手机发一条消息，桌面端 agent 会继续处理。</p>
+            </div>
+          )}
+          {messages.map((m) => (
+            <ErrorBoundary key={m.id}>
+              <MessageBubble message={m} />
+            </ErrorBoundary>
+          ))}
 
-        {plan && (
-          <ErrorBoundary>
-            <PlanCard stream={stream} />
-          </ErrorBoundary>
-        )}
-        {commandApproval && (
-          <ErrorBoundary>
-            <CommandApprovalCard stream={stream} />
-          </ErrorBoundary>
-        )}
-        {permission && (
-          <ErrorBoundary>
-            <PermissionCard stream={stream} />
-          </ErrorBoundary>
-        )}
-        {question && (
-          <ErrorBoundary>
-            <QuestionCard stream={stream} />
-          </ErrorBoundary>
-        )}
+          {plan && (
+            <ErrorBoundary>
+              <PlanCard stream={stream} />
+            </ErrorBoundary>
+          )}
+          {commandApproval && (
+            <ErrorBoundary>
+              <CommandApprovalCard stream={stream} />
+            </ErrorBoundary>
+          )}
+          {permission && (
+            <ErrorBoundary>
+              <PermissionCard stream={stream} />
+            </ErrorBoundary>
+          )}
+          {question && (
+            <ErrorBoundary>
+              <QuestionCard stream={stream} />
+            </ErrorBoundary>
+          )}
 
-        {error && error.code !== 'INTERNAL' && (
-          <div className="p-3 rounded-lg bg-red-950/40 border border-red-900/50">
-            <p className="text-xs font-medium text-red-300">{error.code}</p>
-            {error.message && (
-              <p className="text-xs text-red-400/80 mt-1">{error.message}</p>
-            )}
-          </div>
-        )}
-      </div>
+          {error && error.code !== 'INTERNAL' && (
+            <div className="p-3 rounded-lg bg-red-950/40 border border-red-900/50">
+              <p className="text-xs font-medium text-red-300">{error.code}</p>
+              {error.message && (
+                <p className="text-xs text-red-400/80 mt-1">{error.message}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {!atBottom && (
         <button
@@ -148,8 +162,39 @@ function SessionDetailInner({
         </button>
       )}
 
-      <PromptComposer stream={stream} />
+      <PromptComposer
+        stream={stream}
+        mode={mode}
+        onModeChange={setMode}
+        shellDisabled={shellDisabled}
+      />
     </div>
+  )
+}
+
+function ShellModePane({
+  deviceId,
+  worktreeId,
+  worktreePath
+}: {
+  deviceId: string
+  worktreeId: string | null
+  worktreePath: string | null
+}): React.JSX.Element {
+  const terminal = useTerminalStream(deviceId, worktreeId ?? 'missing-worktree')
+
+  useEffect(() => {
+    if (!worktreeId || !worktreePath) return
+    terminal.attach(worktreePath)
+  }, [terminal, worktreeId, worktreePath])
+
+  return (
+    <MobileTerminalPane
+      state={terminal.state}
+      sendInput={terminal.sendInput}
+      resize={terminal.resize}
+      restart={terminal.restart}
+    />
   )
 }
 

@@ -25,11 +25,13 @@ import { app, type BrowserWindow } from 'electron'
 import { getDatabase } from '../../db/database'
 import type { AgentRuntimeManager } from '../agent-runtime-manager'
 import { getClaudeTranscriptPath } from '../claude-transcript-reader'
+import { ptyService } from '../pty-service'
 import {
   createHubBridge,
   wrapBrowserWindow,
   type HubBridge
 } from './hub-bridge'
+import { HubTerminalBridge } from './hub-terminal-bridge'
 import { HubRegistry } from './hub-registry'
 import {
   createHubServer,
@@ -85,6 +87,7 @@ export interface HubStatusSnapshot {
 export class HubController extends EventEmitter {
   readonly registry: HubRegistry
   readonly bridge: HubBridge
+  readonly terminalBridge: HubTerminalBridge
   readonly server: HubServer
   readonly tunnel: TunnelService
   /** Wrapped window — pass this to runtimeManager.setMainWindow() in main. */
@@ -138,12 +141,18 @@ export class HubController extends EventEmitter {
       }
     })
 
+    this.terminalBridge = new HubTerminalBridge({
+      registry: this.registry,
+      ptyService
+    })
+
     this.wrappedWindow = wrapBrowserWindow(opts.mainWindow, this.bridge)
 
     this.server = createHubServer({
       db: getDatabase().getDb(),
       registry: this.registry,
       bridge: this.bridge,
+      terminalBridge: this.terminalBridge,
       getMobileDistRoot: defaultMobileDistRoot
     })
 

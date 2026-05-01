@@ -282,6 +282,43 @@ describe('hub-server: attach replay selection', () => {
   })
 })
 
+describe('hub-server: terminal attach plumbing', () => {
+  it('forwards terminal websocket attachment to the terminal bridge', () => {
+    const db = makeDb()
+    const registry = new HubRegistry({ localDeviceId: 'dev-local', localDeviceName: 'laptop' })
+    const attachClient = vi.fn()
+    const server = createHubServer({
+      db,
+      registry,
+      terminalBridge: {
+        attachClient
+      } as never
+    })
+
+    ;(
+      server as unknown as {
+        attachTerminalClient: (
+          ws: { send: (data: string) => void; on: (event: string, cb: (...args: unknown[]) => void) => void; readyState: number },
+          deviceId: string,
+          worktreeId: string,
+          terminalBridge: { attachClient: (...args: unknown[]) => void }
+        ) => void
+      }
+    ).attachTerminalClient(
+      {
+        readyState: 1,
+        send: vi.fn(),
+        on: vi.fn()
+      },
+      'dev-local',
+      'wt-1',
+      { attachClient } as never
+    )
+
+    expect(attachClient).toHaveBeenCalled()
+  })
+})
+
 describe('hub-server: /health + setup bootstrap', () => {
   beforeEach(async () => {
     ctx = await boot()

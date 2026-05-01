@@ -60,6 +60,7 @@ import {
   verifyPassword
 } from './hub-auth'
 import type { HubBridge } from './hub-bridge'
+import type { HubTerminalBridge } from './hub-terminal-bridge'
 import type { HubRegistry, HubSubscriber } from './hub-registry'
 import type { HubMessage, ServerMsg } from './hub-protocol'
 
@@ -99,6 +100,8 @@ export interface HubServerOptions {
   registry: HubRegistry
   /** Optional — if absent, /ws/ui closes 1011. */
   bridge?: HubBridge
+  /** Optional — if absent, /ws/terminal closes 1011. */
+  terminalBridge?: HubTerminalBridge
   /**
    * Returns absolute path to the mobile UI dist directory, or null when no
    * static UI is available (e.g. tests).
@@ -453,6 +456,7 @@ class HubServerImpl implements HubServer {
   private readonly db: Database
   private readonly registry: HubRegistry
   private readonly bridge?: HubBridge
+  private readonly terminalBridge?: HubTerminalBridge
   private readonly getMobileDistRoot?: () => string | null
   private readonly now: () => number
   private readonly rateLimiter: LoginRateLimiter
@@ -466,6 +470,7 @@ class HubServerImpl implements HubServer {
     this.db = o.db
     this.registry = o.registry
     this.bridge = o.bridge
+    this.terminalBridge = o.terminalBridge
     this.getMobileDistRoot = o.getMobileDistRoot
     this.now = o.now ?? Date.now
     this.rateLimiter = o.rateLimiter ?? new LoginRateLimiter()
@@ -997,8 +1002,9 @@ class HubServerImpl implements HubServer {
     wss: WebSocketServer
   ): void {
     const url = req.url ?? ''
-    const m = url.match(/^\/ws\/ui\/([^/?]+)\/([^/?]+)/)
-    if (!m) {
+    const chatMatch = url.match(/^\/ws\/ui\/([^/?]+)\/([^/?]+)/)
+    const terminalMatch = url.match(/^\/ws\/terminal\/([^/?]+)\/([^/?]+)/)
+    if (!chatMatch && !terminalMatch) {
       this.rejectUpgrade(socket, '404 Not Found')
       return
     }
@@ -1011,15 +1017,27 @@ class HubServerImpl implements HubServer {
       this.rejectUpgrade(socket, '401 Unauthorized')
       return
     }
-    const deviceId = decodeURIComponent(m[1]!)
-    const hiveSessionId = decodeURIComponent(m[2]!)
-    const bridge = this.bridge
-    if (!bridge) {
-      this.rejectUpgrade(socket, '503 Service Unavailable')
-      return
-    }
     wss.handleUpgrade(req, socket, head, (ws) => {
-      this.attachClient(ws, deviceId, hiveSessionId, bridge)
+      if (chatMatch) {
+        const deviceId = decodeURIComponent(chatMatch[1]!)
+        const hiveSessionId = decodeURIComponent(chatMatch[2]!)
+        const bridge = this.bridge
+        if (!bridge) {
+          this.rejectUpgrade(socket, '503 Service Unavailable')
+          return
+        }
+        this.attachClient(ws, deviceId, hiveSessionId, bridge)
+        return
+      }
+
+      const deviceId = decodeURIComponent(terminalMatch![1]!)
+      const worktreeId = decodeURIComponent(terminalMatch![2]!)
+      const terminalBridge = this.terminalBridge
+      if (!terminalBridge) {
+        this.rejectUpgrade(socket, '503 Service Unavailable')
+        return
+      }
+      this.attachTerminalClient(ws, deviceId, worktreeId, terminalBridge)
     })
   }
 
@@ -1088,6 +1106,44 @@ class HubServerImpl implements HubServer {
     })
     ws.on('error', () => {
       this.registry.unsubscribe(subscriber, deviceId, hiveSessionId)
+    })
+  }
+
+  private attachTerminalClient(
+    ws: WebSocket,
+    deviceId: string,
+    worktreeId: string,
+    terminalBridge: HubTerminalBridge
+  ): void {
+    const subscriber = {
+      send: (data: string) => ws.send(data),
+      get readyState() {
+        return ws.readyState
+      }
+    }
+
+    terminalBridge.attachClient(subscriber, deviceId, worktreeId)
+
+    ws.on('message', (raw) => {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(typeof raw === 'string' ? raw : raw.toString('utf8'))
+      } catch {
+        ws.send(JSON.stringify({ type: 'terminal/error', code: 'BAD_REQUEST', message: 'invalid JSON' }))
+        return
+      }
+      terminalBridge.handleClientMessage(subscriber, worktreeId, parsed).catch((err) => {
+        log.warn('terminalBridge.handleClientMessage threw', {
+          error: err instanceof Error ? err.message : String(err)
+        })
+      })
+    })
+
+    ws.on('close', () => {
+      terminalBridge.detachClient(subscriber, worktreeId)
+    })
+    ws.on('error', () => {
+      terminalBridge.detachClient(subscriber, worktreeId)
     })
   }
 }
