@@ -45,19 +45,31 @@ download() {
   chmod +x "${dst_file}" || true
 }
 
-download "darwin-arm64"  "cloudflared-darwin-arm64.tgz" "cloudflared.tgz"
-if [[ -f "${dst_root}/darwin-arm64/cloudflared.tgz" ]]; then
-  tar -xzf "${dst_root}/darwin-arm64/cloudflared.tgz" -C "${dst_root}/darwin-arm64"
-  rm -f "${dst_root}/darwin-arm64/cloudflared.tgz"
-  chmod +x "${dst_root}/darwin-arm64/cloudflared"
-fi
+download_tgz_binary() {
+  local platform="$1"
+  local upstream="$2"
+  local archive_name="$3"
+  local binary_name="$4"
+  local dst_dir="${dst_root}/${platform}"
+  local archive_file="${dst_dir}/${archive_name}"
+  local binary_file="${dst_dir}/${binary_name}"
 
-download "darwin-amd64"  "cloudflared-darwin-amd64.tgz" "cloudflared.tgz"
-if [[ -f "${dst_root}/darwin-amd64/cloudflared.tgz" ]]; then
-  tar -xzf "${dst_root}/darwin-amd64/cloudflared.tgz" -C "${dst_root}/darwin-amd64"
-  rm -f "${dst_root}/darwin-amd64/cloudflared.tgz"
-  chmod +x "${dst_root}/darwin-amd64/cloudflared"
-fi
+  if [[ -f "${binary_file}" ]]; then
+    echo "[skip] ${platform} already present at ${binary_file}"
+    return
+  fi
+
+  download "${platform}" "${upstream}" "${archive_name}"
+  if [[ -f "${archive_file}" ]]; then
+    tar -xzf "${archive_file}" -C "${dst_dir}"
+    rm -f "${archive_file}"
+    chmod +x "${binary_file}"
+  fi
+}
+
+download_tgz_binary "darwin-arm64" "cloudflared-darwin-arm64.tgz" "cloudflared.tgz" "cloudflared"
+
+download_tgz_binary "darwin-amd64" "cloudflared-darwin-amd64.tgz" "cloudflared.tgz" "cloudflared"
 
 download "linux-amd64"   "cloudflared-linux-amd64"      "cloudflared"
 download "linux-arm64"   "cloudflared-linux-arm64"      "cloudflared"

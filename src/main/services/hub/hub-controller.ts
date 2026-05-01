@@ -395,7 +395,8 @@ export class HubController extends EventEmitter {
         worktreePath: string,
         agentSessionId: string,
         hiveSessionId: string
-      ) => Promise<unknown>
+      ) => Promise<{ success?: boolean; staleThread?: boolean } | unknown>
+      connect?: (worktreePath: string, hiveSessionId: string) => Promise<{ sessionId: string }>
     } | null
     if (!impl?.reconnect) {
       log.warn('lazyMaterialize: implementer missing reconnect', {
@@ -431,6 +432,23 @@ export class HubController extends EventEmitter {
 
     try {
       const result = await impl.reconnect(worktreePath, agentSessionId, hiveSessionId)
+      if ((result as { staleThread?: boolean } | undefined)?.staleThread) {
+        if (!impl.connect) {
+          log.warn('lazyMaterialize: stale codex thread but implementer has no connect', {
+            hiveSessionId,
+            runtimeId,
+            worktreePath,
+            agentSessionId
+          })
+          return null
+        }
+
+        const fresh = await impl.connect(worktreePath, hiveSessionId)
+        db.updateSession(hiveSessionId, { opencode_session_id: fresh.sessionId })
+        this.bridge.registerSessionRouting(hiveSessionId, worktreePath, fresh.sessionId)
+        return { worktreePath, agentSessionId: fresh.sessionId, runtimeId }
+      }
+
       if (!result?.success) {
         log.warn('lazyMaterialize: reconnect returned unsuccessful result', {
           hiveSessionId,
@@ -450,6 +468,7 @@ export class HubController extends EventEmitter {
       })
       return null
     }
+    this.bridge.registerSessionRouting(hiveSessionId, worktreePath, agentSessionId)
     return { worktreePath, agentSessionId, runtimeId }
   }
 }

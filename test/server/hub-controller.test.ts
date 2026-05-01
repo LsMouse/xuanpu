@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getSession = vi.fn()
 const getWorktree = vi.fn()
+const updateSession = vi.fn()
 
 vi.mock('../../src/main/services/logger', () => ({
   createLogger: () => ({
@@ -20,12 +21,16 @@ vi.mock('../../src/main/db/database', () => ({
       })
     }),
     getSession,
-    getWorktree
+    getWorktree,
+    updateSession
   })
 }))
 
 vi.mock('../../src/main/services/hub/hub-bridge', () => ({
-  createHubBridge: () => ({}),
+  createHubBridge: () => ({
+    registerSessionRouting: vi.fn(),
+    forgetSession: vi.fn()
+  }),
   wrapBrowserWindow: (window: unknown) => window
 }))
 
@@ -95,5 +100,44 @@ describe('hub-controller: lazyMaterialize', () => {
 
     expect(reconnect).toHaveBeenCalledWith('/tmp/wt-1', 'thread-1', 'hive-1')
     expect(result).toBeNull()
+  })
+
+  it('connects a fresh codex session when reconnect reports staleThread', async () => {
+    getSession.mockReturnValue({
+      id: 'hive-1',
+      worktree_id: 'wt-1',
+      agent_sdk: 'codex',
+      opencode_session_id: 'thread-stale'
+    })
+    getWorktree.mockReturnValue({
+      id: 'wt-1',
+      path: '/tmp/wt-1'
+    })
+
+    const reconnect = vi.fn(async () => ({ success: false, staleThread: true }))
+    const connect = vi.fn(async () => ({ sessionId: 'thread-fresh' }))
+    const controller = makeController({
+      getImplementer: vi.fn(() => ({ reconnect, connect }))
+    })
+
+    const result = await (
+      controller as unknown as {
+        lazyMaterialize: (
+          mgr: unknown,
+          hiveSessionId: string
+        ) => Promise<{ worktreePath: string; agentSessionId: string; runtimeId: string } | null>
+      }
+    ).lazyMaterialize({ getImplementer: vi.fn(() => ({ reconnect, connect })) }, 'hive-1')
+
+    expect(reconnect).toHaveBeenCalledWith('/tmp/wt-1', 'thread-stale', 'hive-1')
+    expect(connect).toHaveBeenCalledWith('/tmp/wt-1', 'hive-1')
+    expect(updateSession).toHaveBeenCalledWith('hive-1', {
+      opencode_session_id: 'thread-fresh'
+    })
+    expect(result).toEqual({
+      worktreePath: '/tmp/wt-1',
+      agentSessionId: 'thread-fresh',
+      runtimeId: 'codex'
+    })
   })
 })

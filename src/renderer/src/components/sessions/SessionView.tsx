@@ -3081,16 +3081,17 @@ export function SessionView({ sessionId }: SessionViewProps): React.JSX.Element 
           )
           if (shouldAbortInit()) return
           if (reconnectResult.success) {
-            setOpencodeSessionId(existingOpcSessionId)
-            useSessionStore.getState().setOpenCodeSessionId(sessionId, existingOpcSessionId)
-            transcriptSourceRef.current.opencodeSessionId = existingOpcSessionId
+            const activeSessionId = reconnectResult.sessionId ?? existingOpcSessionId
+            setOpencodeSessionId(activeSessionId)
+            useSessionStore.getState().setOpenCodeSessionId(sessionId, activeSessionId)
+            transcriptSourceRef.current.opencodeSessionId = activeSessionId
             // Only update revertMessageID from reconnect if it carries a value;
             // sessionInfo already hydrated the authoritative value earlier.
             if (reconnectResult.revertMessageID != null) {
               setRevertMessageID(reconnectResult.revertMessageID)
             }
             fetchModelLimits()
-            fetchCommands(wtPath, existingOpcSessionId)
+            fetchCommands(wtPath, activeSessionId)
             hydratePermissions(wtPath)
             // Create response log file if logging is enabled
             if (isLogModeRef.current) {
@@ -3148,10 +3149,10 @@ export function SessionView({ sessionId }: SessionViewProps): React.JSX.Element 
 
             // Refresh transcript using the confirmed live OpenCode session ID.
             // This avoids keeping a stale/partial pre-connect transcript.
-            await loadMessages({ worktreePath: wtPath, opencodeSessionId: existingOpcSessionId })
+            await loadMessages({ worktreePath: wtPath, opencodeSessionId: activeSessionId })
             if (shouldAbortInit()) return
 
-            await sendPendingMessage(wtPath, existingOpcSessionId)
+            await sendPendingMessage(wtPath, activeSessionId)
             return
           }
         }
@@ -3284,13 +3285,14 @@ export function SessionView({ sessionId }: SessionViewProps): React.JSX.Element 
           sessionId
         )
         if (reconnectResult.success) {
-          setOpencodeSessionId(existingOpcSessionId)
-          useSessionStore.getState().setOpenCodeSessionId(sessionId, existingOpcSessionId)
-          transcriptSourceRef.current.opencodeSessionId = existingOpcSessionId
+          const nextSessionId = reconnectResult.sessionId ?? existingOpcSessionId
+          setOpencodeSessionId(nextSessionId)
+          useSessionStore.getState().setOpenCodeSessionId(sessionId, nextSessionId)
+          transcriptSourceRef.current.opencodeSessionId = nextSessionId
           if (reconnectResult.revertMessageID != null) {
             setRevertMessageID(reconnectResult.revertMessageID)
           }
-          activeOpcSessionId = existingOpcSessionId
+          activeOpcSessionId = nextSessionId
         } else {
           setRevertMessageID(null)
           activeOpcSessionId = null

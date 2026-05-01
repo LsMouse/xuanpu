@@ -125,22 +125,27 @@ export function Sessions(): React.JSX.Element {
   return (
     <div
       ref={ref}
-      className="min-h-dvh safe-pad-top safe-pad-bottom overflow-y-auto"
+      className="mobile-page mobile-scroll h-dvh overflow-y-auto safe-pad-top safe-pad-bottom"
     >
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-zinc-900 sticky top-0 bg-zinc-950/95 backdrop-blur z-10">
+      <header className="mobile-header px-4 py-3.5">
+        <div className="flex items-center gap-3">
         <Link
           to="/devices"
-          className="text-zinc-400 text-xl leading-none active:text-zinc-200"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-zinc-900 text-xl text-zinc-300 active:bg-zinc-800"
           aria-label="返回"
         >
           ←
         </Link>
-        <h1 className="text-lg font-semibold">会话</h1>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">Sessions</p>
+            <h1 className="mt-0.5 text-2xl font-semibold tracking-tight">会话</h1>
+          </div>
+        </div>
       </header>
 
       <PullIndicator pulling={pulling} refreshing={refreshing || loading} />
 
-      <div className="p-4 space-y-4">
+      <div className="space-y-4 px-4 py-4">
         {loading && !sessions && <SkeletonRows />}
 
         {error && <ErrorBanner message={error} onRetry={() => refreshSessions(deviceId!)} />}
@@ -170,52 +175,52 @@ function GroupSection({
   const badgeStyle = getProjectBadgeStyle(group.projectName)
 
   return (
-    <section className="rounded-[28px] border border-zinc-800/80 bg-[radial-gradient(circle_at_top_left,rgba(244,244,245,0.12),transparent_38%),linear-gradient(180deg,rgba(24,24,27,0.96),rgba(10,10,12,0.98))] p-3 shadow-[0_18px_60px_rgba(0,0,0,0.26)]">
-      <div className="mb-3 flex items-center gap-3 rounded-2xl border border-zinc-800/80 bg-zinc-900/65 px-3 py-3">
+    <section className="mobile-card rounded-[30px] p-3.5">
+      <div className="mb-3 flex items-center gap-3 rounded-[22px] border border-zinc-800/70 bg-zinc-950/45 px-3 py-3">
         <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-black tracking-[0.2em] ${badgeStyle.badge} ${badgeStyle.glow}`}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] text-sm font-black tracking-[0.14em] ${badgeStyle.badge} ${badgeStyle.glow}`}
         >
           {getProjectInitials(group.projectName)}
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold text-zinc-100">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[17px] font-semibold text-zinc-100">
             {group.projectName}
           </p>
-          <p className="mt-0.5 text-xs text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-500">
             {group.sessions.length} 个会话
           </p>
         </div>
       </div>
 
-      <ul className="space-y-2">
+      <ul className="space-y-2.5">
         {group.sessions.map((s) => (
           <li key={s.hiveSessionId}>
             <Link
               to={`/session/${encodeURIComponent(deviceId)}/${encodeURIComponent(s.hiveSessionId)}`}
-              className="block rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-3 transition-colors active:bg-zinc-800"
+              className="block rounded-[22px] border border-zinc-800/70 bg-zinc-950/42 px-3.5 py-3.5 transition active:scale-[0.99] active:bg-zinc-800/80"
             >
-              <div className="flex items-center gap-2">
-                <span className="font-medium truncate flex-1 min-w-0">
+              <div className="flex items-center gap-2.5">
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-zinc-100">
                   {s.name ?? `会话 ${s.hiveSessionId.slice(0, 8)}`}
                 </span>
                 {s.runtimeStatus === 'busy' && (
                   <span
-                    className="h-2 w-2 rounded-full bg-red-500 shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]"
+                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500 shadow-[0_0_9px_rgba(239,68,68,0.8)]"
                     title="运行中"
                   />
                 )}
                 {s.runtimeStatus === 'error' && (
                   <span
-                    className="h-2 w-2 rounded-full bg-amber-500 shrink-0"
+                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500"
                     title="出错"
                   />
                 )}
               </div>
-              <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-zinc-500">
-                <span className="truncate">
+              <div className="mt-2 flex items-center justify-between gap-3 text-sm text-zinc-500">
+                <span className="min-w-0 truncate">
                   {s.worktree?.name || s.worktree?.path?.split('/').pop() || '未关联 worktree'}
                 </span>
-                <span className="shrink-0">{formatRelativeTime(s.updatedAt)}</span>
+                <span className="shrink-0 text-xs">{formatRelativeTime(s.updatedAt)}</span>
               </div>
             </Link>
           </li>

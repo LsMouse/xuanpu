@@ -30,19 +30,19 @@ export function Login(): React.JSX.Element {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-dvh px-6 safe-pad-top safe-pad-bottom">
-      <div className="w-full max-w-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 rounded-lg bg-zinc-800 flex items-center justify-center text-lg font-semibold">
+    <div className="mobile-page flex min-h-dvh flex-col justify-end px-5 pb-10 pt-8 safe-pad-top safe-pad-bottom min-[420px]:justify-center">
+      <div className="w-full max-w-sm mx-auto">
+        <div className="mb-7 flex items-center gap-3.5">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 text-xl font-black text-zinc-950 shadow-[0_14px_40px_rgba(244,244,245,0.16)]">
             玄
           </div>
           <div>
-            <h1 className="text-2xl font-semibold leading-none">Xuanpu</h1>
-            <p className="text-sm text-zinc-400 mt-1">Hub 远程访问</p>
+            <h1 className="text-3xl font-semibold tracking-tight leading-none">Xuanpu</h1>
+            <p className="mt-1.5 text-[15px] text-zinc-400">Hub 远程访问</p>
           </div>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-3">
+        <form onSubmit={onSubmit} className="mobile-card rounded-[28px] p-3.5 space-y-3.5">
           <label className="block">
             <span className="sr-only">用户名</span>
             <input
@@ -53,7 +53,7 @@ export function Login(): React.JSX.Element {
               autoComplete="username"
               autoCapitalize="none"
               autoCorrect="off"
-              className="w-full px-3 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-base focus:outline-none focus:border-zinc-600"
+              className="w-full rounded-2xl border border-zinc-800 bg-zinc-950/80 px-4 py-4 text-[17px] text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-zinc-500 focus:bg-zinc-950"
             />
           </label>
           <label className="block">
@@ -64,49 +64,49 @@ export function Login(): React.JSX.Element {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              className="w-full px-3 py-3 rounded-lg bg-zinc-900 border border-zinc-800 text-base focus:outline-none focus:border-zinc-600"
+              className="w-full rounded-2xl border border-zinc-800 bg-zinc-950/80 px-4 py-4 text-[17px] text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-zinc-500 focus:bg-zinc-950"
             />
           </label>
           {error && (
-            <p className="text-sm text-red-400 px-1" role="alert">
+            <p className="rounded-2xl border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-200" role="alert">
               {error}
             </p>
           )}
           <button
             type="submit"
             disabled={submitting || !username.trim() || !password}
-            className="w-full py-3 rounded-lg bg-zinc-100 text-zinc-900 font-medium disabled:opacity-50 active:bg-zinc-200"
+            className="h-13 w-full rounded-2xl bg-zinc-100 text-base font-semibold text-zinc-950 shadow-[0_14px_34px_rgba(244,244,245,0.12)] transition active:scale-[0.99] active:bg-white disabled:opacity-45 disabled:active:scale-100"
           >
             {submitting ? '登录中…' : '登录'}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="mt-5 text-center">
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
-            className="text-xs text-zinc-500 hover:text-zinc-300"
+            className="rounded-full px-4 py-2 text-sm text-zinc-500 active:bg-zinc-900 active:text-zinc-300"
           >
             {showAdvanced ? '收起高级设置' : '高级设置'}
           </button>
         </div>
 
         {showAdvanced && (
-          <div className="mt-4 p-3 rounded-lg bg-zinc-900 border border-zinc-800 space-y-2">
+          <div className="mobile-card mt-4 space-y-3 rounded-3xl p-4">
             <label className="block">
-              <span className="text-xs text-zinc-400">Hub API 地址</span>
+              <span className="text-sm font-medium text-zinc-300">Hub API 地址</span>
               <input
                 type="url"
                 value={apiBaseDraft}
                 onChange={(e) => setApiBaseDraft(e.target.value)}
                 placeholder="https://xxx.trycloudflare.com"
-                className="w-full mt-1 px-2 py-2 rounded bg-zinc-950 border border-zinc-800 text-sm font-mono"
+                className="mt-2 w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-3 text-sm font-mono text-zinc-100 outline-none focus:border-zinc-500"
               />
             </label>
             <button
               type="button"
               onClick={saveApiBase}
-              className="w-full py-2 rounded bg-zinc-800 text-zinc-200 text-sm"
+              className="h-11 w-full rounded-2xl bg-zinc-800 text-sm font-medium text-zinc-100 active:bg-zinc-700"
             >
               保存并刷新
             </button>

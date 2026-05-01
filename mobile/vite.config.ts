@@ -8,9 +8,11 @@ import tailwindcss from '@tailwindcss/vite'
 // and point their phone at `http://<laptop-ip>:5173?api=http://...:8317`.
 //
 // In production, electron-builder packs `mobile/dist` into resources/mobile-ui.
+// Hub serves the mobile SPA at `/` and falls back nested routes like
+// `/sessions/:deviceId` to `index.html`, so asset URLs must be root-relative.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: './',
+  base: '/',
   server: {
     host: '0.0.0.0',
     port: 5173,

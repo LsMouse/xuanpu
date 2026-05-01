@@ -32,6 +32,8 @@ export interface AgentRuntimeAdapter {
     success: boolean
     sessionStatus?: 'idle' | 'busy' | 'retry'
     revertMessageID?: string | null
+    sessionId?: string
+    staleThread?: boolean
   }>
   disconnect(worktreePath: string, agentSessionId: string): Promise<void>
   cleanup(): Promise<void>

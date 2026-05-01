@@ -22,7 +22,7 @@ export function MessageBubble({ message }: { message: HubMessage }): React.JSX.E
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] px-3 py-2 rounded-2xl bg-zinc-100 text-zinc-900">
+        <div className="max-w-[88%] rounded-[22px] bg-zinc-100 px-4 py-3 text-[15px] leading-6 text-zinc-950 shadow-[0_14px_34px_rgba(244,244,245,0.12)]">
           {message.parts.map((p, i) => (
             <PartView key={i} part={p} role="user" />
           ))}
@@ -32,7 +32,7 @@ export function MessageBubble({ message }: { message: HubMessage }): React.JSX.E
   }
   if (message.role === 'system') {
     return (
-      <div className="text-center text-xs text-zinc-500 py-1">
+      <div className="py-1 text-center text-xs text-zinc-500">
         {message.parts.map((p, i) => (
           <PartView key={i} part={p} role="system" />
         ))}
@@ -51,7 +51,7 @@ export function MessageBubble({ message }: { message: HubMessage }): React.JSX.E
   })
 
   return (
-    <div className="space-y-2 text-zinc-100">
+    <div className="space-y-3 text-[15px] leading-7 text-zinc-100">
       {actionParts.map(({ part, idx }) => (
         <PartView key={idx} part={part} role="assistant" />
       ))}
@@ -72,7 +72,7 @@ function PartView({
   switch (part.type) {
     case 'text':
       return role === 'user' ? (
-        <p className="whitespace-pre-wrap leading-relaxed">{part.text}</p>
+        <p className="whitespace-pre-wrap break-words leading-relaxed">{part.text}</p>
       ) : (
         <MiniMarkdown text={part.text} />
       )
@@ -107,7 +107,7 @@ function ToolResultChip({
     <button
       onClick={() => setOpen((v) => !v)}
       className={
-        'w-full text-left px-3 py-2 rounded-lg border active:bg-zinc-800 ' +
+        'w-full text-left rounded-2xl border px-3.5 py-3 active:bg-zinc-800 ' +
         (isError
           ? 'bg-red-950/30 border-red-900/60'
           : 'bg-zinc-900 border-zinc-800')
@@ -119,7 +119,7 @@ function ToolResultChip({
         </span>
       </div>
       {open && output !== undefined && (
-        <pre className="mt-2 text-xs font-mono text-zinc-300 whitespace-pre-wrap break-words">
+        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs font-mono leading-5 text-zinc-300">
           {safeStringify(output)}
         </pre>
       )}
@@ -138,14 +138,14 @@ function DiffChip({
   return (
     <button
       onClick={() => setOpen((v) => !v)}
-      className="w-full text-left px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 active:bg-zinc-800"
+      className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 px-3.5 py-3 text-left active:bg-zinc-800"
     >
       <div className="flex items-center gap-2">
         <span className="text-xs uppercase tracking-wider text-zinc-500">diff</span>
-        <span className="text-sm font-mono truncate">{filePath}</span>
+        <span className="truncate text-sm font-mono">{filePath}</span>
       </div>
       {open && (
-        <pre className="mt-2 text-xs font-mono text-zinc-300 whitespace-pre overflow-x-auto">
+        <pre className="mt-2 overflow-x-auto whitespace-pre text-xs font-mono leading-5 text-zinc-300">
           {patch}
         </pre>
       )}
@@ -159,14 +159,14 @@ function UnknownChip({ raw }: { raw: unknown }): React.JSX.Element {
   return (
     <button
       onClick={() => setOpen((v) => !v)}
-      className="w-full text-left px-3 py-2 rounded-lg bg-zinc-900/60 border border-zinc-900 text-zinc-400 active:bg-zinc-800"
+      className="w-full rounded-2xl border border-zinc-900 bg-zinc-900/60 px-3.5 py-3 text-left text-zinc-400 active:bg-zinc-800"
     >
       <div className="flex items-center gap-2">
         <span className="text-xs uppercase tracking-wider text-zinc-600">agent activity</span>
         {preview && <span className="text-xs truncate">{preview}</span>}
       </div>
       {open && (
-        <pre className="mt-2 text-xs font-mono text-zinc-400 whitespace-pre-wrap break-words">
+        <pre className="mt-2 whitespace-pre-wrap break-words text-xs font-mono leading-5 text-zinc-400">
           {safeStringify(raw)}
         </pre>
       )}

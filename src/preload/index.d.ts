@@ -554,6 +554,7 @@ declare global {
         hiveSessionId: string
       ) => Promise<
         import('../shared/types/agent-ipc').AgentIpcResult<{
+          sessionId?: string
           sessionStatus?: 'idle' | 'busy' | 'retry'
           revertMessageID?: string | null
         }>

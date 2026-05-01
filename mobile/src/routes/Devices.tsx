@@ -17,21 +17,26 @@ export function Devices(): React.JSX.Element {
   return (
     <div
       ref={ref}
-      className="min-h-dvh safe-pad-top safe-pad-bottom overflow-y-auto"
+      className="mobile-page mobile-scroll h-dvh overflow-y-auto safe-pad-top safe-pad-bottom"
     >
-      <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-900 sticky top-0 bg-zinc-950/95 backdrop-blur z-10">
-        <h1 className="text-lg font-semibold">设备</h1>
+      <header className="mobile-header px-4 py-3.5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">Xuanpu Hub</p>
+            <h1 className="mt-0.5 text-2xl font-semibold tracking-tight">设备</h1>
+          </div>
         <button
           onClick={() => logout()}
-          className="text-sm text-zinc-400 hover:text-zinc-200 active:text-zinc-100"
+          className="shrink-0 rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-300 active:bg-zinc-800"
         >
           {username ? `${username} · 登出` : '登出'}
         </button>
+        </div>
       </header>
 
       <PullIndicator pulling={pulling} refreshing={refreshing || loadingDevices} />
 
-      <div className="p-4 space-y-3">
+      <div className="space-y-3 px-4 py-4">
         {loadingDevices && devices.length === 0 && <SkeletonRows />}
 
         {devicesError && (
@@ -49,25 +54,27 @@ export function Devices(): React.JSX.Element {
           <Link
             key={d.id}
             to={`/sessions/${encodeURIComponent(d.id)}`}
-            className="block p-4 rounded-xl bg-zinc-900 border border-zinc-800 active:bg-zinc-800 transition-colors"
+            className="mobile-card block rounded-[26px] p-4 transition active:scale-[0.99] active:bg-zinc-800"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <span
                 className={
                   d.online
-                    ? 'h-2.5 w-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'
-                    : 'h-2.5 w-2.5 rounded-full bg-zinc-600'
+                    ? 'h-3 w-3 shrink-0 rounded-full bg-green-400 shadow-[0_0_12px_rgba(74,222,128,0.65)]'
+                    : 'h-3 w-3 shrink-0 rounded-full bg-zinc-600'
                 }
               />
-              <span className="font-medium">{d.name}</span>
-              <span className="ml-auto text-zinc-500 text-sm">›</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[17px] font-semibold text-zinc-100">{d.name}</p>
+                <p className="mt-1 truncate text-sm text-zinc-500">
+                  {d.hostname}
+                  {!d.online && d.lastSeen
+                    ? ` · 最后在线 ${formatRelativeTime(d.lastSeen)}`
+                    : ''}
+                </p>
+              </div>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-zinc-800 text-lg text-zinc-400">›</span>
             </div>
-            <p className="text-xs text-zinc-500 mt-1 ml-4.5">
-              {d.hostname}
-              {!d.online && d.lastSeen
-                ? ` · 最后在线 ${formatRelativeTime(d.lastSeen)}`
-                : ''}
-            </p>
           </Link>
         ))}
       </div>
@@ -86,7 +93,7 @@ function PullIndicator({
 }): React.JSX.Element | null {
   if (!refreshing && pulling === 0) return null
   return (
-    <div className="flex items-center justify-center py-2 text-xs text-zinc-500">
+    <div className="flex items-center justify-center py-2 text-sm text-zinc-500">
       {refreshing ? (
         <span>刷新中…</span>
       ) : (
@@ -102,7 +109,7 @@ function SkeletonRows(): React.JSX.Element {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="h-16 rounded-xl bg-zinc-900 border border-zinc-800 animate-pulse"
+          className="h-20 rounded-[26px] border border-zinc-800 bg-zinc-900 animate-pulse"
         />
       ))}
     </>
@@ -117,9 +124,9 @@ function EmptyState({
   hint: string
 }): React.JSX.Element {
   return (
-    <div className="text-center py-12 text-zinc-500">
-      <p className="font-medium">{title}</p>
-      <p className="text-sm mt-1">{hint}</p>
+    <div className="mobile-card rounded-[28px] px-5 py-12 text-center text-zinc-500">
+      <p className="text-lg font-semibold text-zinc-200">{title}</p>
+      <p className="mt-2 text-sm leading-6">{hint}</p>
     </div>
   )
 }
@@ -132,13 +139,13 @@ function ErrorBanner({
   onRetry: () => void
 }): React.JSX.Element {
   return (
-    <div className="p-4 rounded-xl bg-red-950/40 border border-red-900/60">
-      <p className="text-sm text-red-300">加载失败</p>
-      <p className="text-xs text-red-400/80 mt-1 break-words">{message}</p>
+    <div className="rounded-[24px] border border-red-900/60 bg-red-950/35 p-4">
+      <p className="text-base font-semibold text-red-200">加载失败</p>
+      <p className="mt-1.5 break-words text-sm leading-6 text-red-300/80">{message}</p>
       <button
         type="button"
         onClick={onRetry}
-        className="mt-3 px-3 py-1.5 rounded bg-red-900/50 text-sm text-red-100"
+        className="mt-4 h-10 rounded-full bg-red-900/50 px-4 text-sm font-medium text-red-100 active:bg-red-800"
       >
         重试
       </button>

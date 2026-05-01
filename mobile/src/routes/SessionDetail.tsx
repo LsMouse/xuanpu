@@ -50,23 +50,25 @@ function SessionDetailInner({
   }, [messages.length, status, bump])
 
   return (
-    <div className="flex flex-col h-dvh safe-pad-top">
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-zinc-900 bg-zinc-950/95 backdrop-blur shrink-0">
+    <div className="mobile-page flex h-dvh flex-col safe-pad-top">
+      <header className="mobile-header shrink-0 px-4 py-3.5">
+        <div className="flex items-center gap-3">
         <Link
           to={`/sessions/${deviceId}`}
-          className="text-zinc-400 text-xl leading-none active:text-zinc-200"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-zinc-900 text-xl text-zinc-300 active:bg-zinc-800"
           aria-label="返回"
         >
           ←
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-semibold truncate" title={headerTitle}>
+          <h1 className="truncate text-[17px] font-semibold tracking-tight" title={headerTitle}>
             {headerTitle}
           </h1>
           <ConnectionLine
             connection={connection}
             status={status}
           />
+        </div>
         </div>
       </header>
 
@@ -91,13 +93,14 @@ function SessionDetailInner({
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-3 py-4 space-y-3"
+        className="mobile-scroll min-h-0 flex-1 overflow-y-auto px-3.5 py-4 space-y-4"
         data-testid="message-stream"
       >
         {messages.length === 0 && connection === 'open' && (
-          <p className="text-sm text-zinc-500 text-center py-12">
-            还没有消息，发送一条试试。
-          </p>
+          <div className="mx-auto mt-[18dvh] max-w-[260px] rounded-[28px] border border-zinc-900 bg-zinc-950/45 px-5 py-6 text-center">
+            <p className="text-base font-medium text-zinc-300">还没有消息</p>
+            <p className="mt-2 text-sm leading-6 text-zinc-500">从手机发一条消息，桌面端 agent 会继续处理。</p>
+          </div>
         )}
         {messages.map((m) => (
           <ErrorBoundary key={m.id}>

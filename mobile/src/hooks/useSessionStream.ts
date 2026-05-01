@@ -119,6 +119,44 @@ function applyPatch(message: HubMessage, op: MessageUpdateOp): HubMessage {
   return { ...message, parts }
 }
 
+function isLocalOptimisticMessage(message: HubMessage): boolean {
+  return message.id.startsWith('local-')
+}
+
+function getComparableMessageText(message: HubMessage): string {
+  return message.parts
+    .filter((part): part is Extract<HubPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text.trim())
+    .join('\n')
+    .trim()
+}
+
+function hasDurableEcho(message: HubMessage, candidates: HubMessage[]): boolean {
+  if (!isLocalOptimisticMessage(message) || message.role !== 'user') return false
+  const text = getComparableMessageText(message)
+  if (!text) return false
+  return candidates.some((candidate) => {
+    return (
+      !isLocalOptimisticMessage(candidate) &&
+      candidate.role === 'user' &&
+      getComparableMessageText(candidate) === text
+    )
+  })
+}
+
+function mergeSnapshotMessages(
+  currentMessages: HubMessage[],
+  snapshotMessages: HubMessage[]
+): HubMessage[] {
+  const snapshotIds = new Set(snapshotMessages.map((message) => message.id))
+  const localOnlyMessages = currentMessages.filter((message) => {
+    if (snapshotIds.has(message.id)) return false
+    if (hasDurableEcho(message, snapshotMessages)) return false
+    return true
+  })
+  return localOnlyMessages.length > 0 ? [...snapshotMessages, ...localOnlyMessages] : snapshotMessages
+}
+
 function reducer(state: State, action: Action): State {
   if (action.type === 'connection') {
     return { ...state, connection: action.value }
@@ -147,7 +185,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         status: f.status,
-        messages: f.messages,
+        messages: mergeSnapshotMessages(state.messages, f.messages),
         permission: null,
         question: null,
         plan: null,
@@ -155,6 +193,17 @@ function reducer(state: State, action: Action): State {
         error: null
       }
     case 'message/append':
+      if (state.messages.some((message) => message.id === f.message.id)) {
+        return state
+      }
+      if (f.message.role === 'user') {
+        const nextMessages = [...state.messages]
+        const optimisticIdx = nextMessages.findIndex((message) => hasDurableEcho(message, [f.message]))
+        if (optimisticIdx !== -1) {
+          nextMessages[optimisticIdx] = f.message
+          return { ...state, messages: nextMessages }
+        }
+      }
       return { ...state, messages: [...state.messages, f.message] }
     case 'message/update': {
       const idx = state.messages.findIndex((m) => m.id === f.messageId)

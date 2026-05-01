@@ -16,6 +16,7 @@ import {
   COOKIE_NAME,
   getHubEnabled,
   getHubListenHost,
+  selectBufferedFramesForAttach,
   setHubAuthMode,
   setHubCfAccessEmails,
   setHubEnabled,
@@ -183,6 +184,102 @@ afterEach(async () => {
     await ctx.server.stop()
     ctx.db.close()
   }
+})
+
+describe('hub-server: attach replay selection', () => {
+  it('replays the whole buffer when DB history is empty', () => {
+    const frames = [
+      { type: 'status', seq: 1, status: 'busy' as const },
+      {
+        type: 'message/append' as const,
+        seq: 2,
+        message: {
+          id: 'live-1',
+          role: 'assistant' as const,
+          ts: 2_000,
+          seq: 0,
+          parts: [{ type: 'text' as const, text: 'live' }]
+        }
+      }
+    ]
+
+    expect(selectBufferedFramesForAttach([], { status: 'busy', frames })).toEqual(frames)
+  })
+
+  it('replays only the latest live tail when history exists but is older', () => {
+    const frames = [
+      { type: 'status', seq: 1, status: 'busy' as const },
+      {
+        type: 'message/append' as const,
+        seq: 2,
+        message: {
+          id: 'old-live',
+          role: 'assistant' as const,
+          ts: 500,
+          seq: 0,
+          parts: [{ type: 'text' as const, text: 'old' }]
+        }
+      },
+      { type: 'status', seq: 3, status: 'idle' as const },
+      { type: 'status', seq: 4, status: 'busy' as const },
+      {
+        type: 'message/append' as const,
+        seq: 5,
+        message: {
+          id: 'new-live',
+          role: 'assistant' as const,
+          ts: 2_000,
+          seq: 0,
+          parts: [{ type: 'text' as const, text: 'new' }]
+        }
+      },
+      { type: 'status', seq: 6, status: 'idle' as const }
+    ]
+
+    const history = [
+      {
+        id: 'db-1',
+        role: 'assistant' as const,
+        ts: 1_000,
+        seq: 0,
+        parts: [{ type: 'text' as const, text: 'persisted' }]
+      }
+    ]
+
+    expect(selectBufferedFramesForAttach(history, { status: 'idle', frames })).toEqual(
+      frames.slice(3)
+    )
+  })
+
+  it('skips buffered replay when DB history already covers the latest turn', () => {
+    const frames = [
+      { type: 'status', seq: 1, status: 'busy' as const },
+      {
+        type: 'message/append' as const,
+        seq: 2,
+        message: {
+          id: 'live-1',
+          role: 'assistant' as const,
+          ts: 2_000,
+          seq: 0,
+          parts: [{ type: 'text' as const, text: 'latest' }]
+        }
+      },
+      { type: 'status', seq: 3, status: 'idle' as const }
+    ]
+
+    const history = [
+      {
+        id: 'db-1',
+        role: 'assistant' as const,
+        ts: 2_500,
+        seq: 0,
+        parts: [{ type: 'text' as const, text: 'latest persisted' }]
+      }
+    ]
+
+    expect(selectBufferedFramesForAttach(history, { status: 'idle', frames })).toEqual([])
+  })
 })
 
 describe('hub-server: /health + setup bootstrap', () => {

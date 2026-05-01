@@ -66,6 +66,12 @@ export interface CodexSessionState {
   pendingEnvRefresh?: boolean
 }
 
+function isMissingCodexRolloutError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const text = `${error.message}\n${error.cause instanceof Error ? error.cause.message : ''}`
+  return text.includes('thread/resume failed: no rollout found for thread id')
+}
+
 interface CodexLiveToolPart {
   type: 'tool'
   callID: string
@@ -750,6 +756,9 @@ export class CodexImplementer implements AgentSdkImplementer, AgentRuntimeAdapte
         worktreePath,
         agentSessionId
       })
+      if (isMissingCodexRolloutError(error)) {
+        return { success: false, staleThread: true as const }
+      }
       return { success: false }
     }
   }

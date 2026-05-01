@@ -1,5 +1,6 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { openCodeService } from '../services/opencode-service'
+import { getHubController } from '../services/hub/hub-controller'
 import { createLogger } from '../services/logger'
 import { telemetryService } from '../services/telemetry-service'
 import type { DatabaseService } from '../db/database'
@@ -179,6 +180,17 @@ export function registerAgentHandlers(
         }
         const impl = c.runtimeManager.getImplementer(runtimeId)
         const result = await impl.reconnect(worktreePath, runtimeSessionId, hiveSessionId)
+        if (result.staleThread) {
+          log.warn('IPC: agent:reconnect stale codex thread, connecting fresh', {
+            worktreePath,
+            runtimeSessionId,
+            hiveSessionId
+          })
+          const fresh = await impl.connect(worktreePath, hiveSessionId)
+          c.dbService.updateSession(hiveSessionId, { opencode_session_id: fresh.sessionId })
+          getHubController()?.registerSessionRouting(hiveSessionId, worktreePath, fresh.sessionId)
+          return { sessionStatus: 'idle' as const, revertMessageID: null, sessionId: fresh.sessionId }
+        }
         // Strip the inner `success` so the wrapper's success envelope wins
         // (adapter returns success:false on reconnect failure — treat as error path)
         const { success: innerSuccess, ...rest } = result
@@ -337,7 +349,31 @@ export function registerAgentHandlers(
         log.info('IPC: agent:prompt runtime resolution', { runtimeSessionId, runtimeId })
         if (runtimeId === 'terminal') return {}
         const impl = c.runtimeManager.getImplementer(runtimeId)
-        await impl.prompt(worktreePath, runtimeSessionId, messageOrParts, model, options)
+        try {
+          await impl.prompt(worktreePath, runtimeSessionId, messageOrParts, model, options)
+        } catch (err) {
+          const isStaleCodexThread =
+            runtimeId === 'codex' &&
+            err instanceof Error &&
+            err.message.includes('Prompt failed: session not found for')
+
+          if (!isStaleCodexThread) throw err
+
+          log.warn('IPC: agent:prompt stale codex thread, reconnecting fresh', {
+            worktreePath,
+            runtimeSessionId,
+            hiveSessionId
+          })
+
+          const connectResult = await impl.connect(worktreePath, hiveSessionId)
+          c.dbService.updateSession(hiveSessionId, { opencode_session_id: connectResult.sessionId })
+          getHubController()?.registerSessionRouting(
+            hiveSessionId,
+            worktreePath,
+            connectResult.sessionId
+          )
+          await impl.prompt(worktreePath, connectResult.sessionId, messageOrParts, model, options)
+        }
         telemetryService.track('prompt_sent', { runtime_id: runtimeId })
 
         // Phase 21 + 22A: emit session.message with ORIGINAL text (no Field Context
@@ -587,7 +623,20 @@ export function registerAgentHandlers(
         const runtimeId = sessionId ? resolveRuntimeId(c, sessionId) : 'opencode'
         if (runtimeId === 'terminal') return { commands: [] }
         const impl = c.runtimeManager.getImplementer(runtimeId)
-        const commands = await impl.listCommands(worktreePath)
+        let commands: unknown[]
+        try {
+          commands = await impl.listCommands(worktreePath)
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          if (runtimeId === 'opencode' && message.includes('OpenCode CLI not found on PATH')) {
+            log.warn('IPC: agent:commands opencode unavailable, returning empty commands', {
+              worktreePath,
+              sessionId
+            })
+            return { commands: [] }
+          }
+          throw err
+        }
         return { commands }
       }
     })

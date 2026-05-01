@@ -61,6 +61,7 @@ import {
 } from './hub-auth'
 import type { HubBridge } from './hub-bridge'
 import type { HubRegistry, HubSubscriber } from './hub-registry'
+import type { HubMessage, ServerMsg } from './hub-protocol'
 
 const log = createLogger({ component: 'HubServer' })
 
@@ -121,6 +122,45 @@ interface JsonError {
   status: number
   code: string
   message?: string
+}
+
+interface AttachSnapshotData {
+  status: 'idle' | 'busy' | 'retry' | 'error'
+  frames: ServerMsg[]
+}
+
+function frameTimestamp(frame: ServerMsg): number {
+  return frame.type === 'message/append' ? frame.message.ts : -1
+}
+
+function latestHistoryTimestamp(history: HubMessage[]): number {
+  return history.reduce((latest, message) => Math.max(latest, message.ts), 0)
+}
+
+export function selectBufferedFramesForAttach(
+  history: HubMessage[],
+  snapshot: AttachSnapshotData
+): ServerMsg[] {
+  if (history.length === 0) return snapshot.frames
+
+  const latestHistoryTs = latestHistoryTimestamp(history)
+  let latestLiveIdx = -1
+  for (let idx = snapshot.frames.length - 1; idx >= 0; idx -= 1) {
+    if (frameTimestamp(snapshot.frames[idx]!) > latestHistoryTs) {
+      latestLiveIdx = idx
+      break
+    }
+  }
+  if (latestLiveIdx === -1) return []
+
+  let startIdx = latestLiveIdx
+  while (startIdx > 0) {
+    const previous = snapshot.frames[startIdx - 1]!
+    if (previous.type === 'status' && previous.status === 'idle') break
+    startIdx -= 1
+  }
+
+  return snapshot.frames.slice(startIdx)
 }
 
 function sendJson(
@@ -1018,13 +1058,11 @@ class HubServerImpl implements HubServer {
           lastSeq: snapshot.lastSeq
         })
       )
-      // Only replay the in-memory ring buffer when there's no DB history.
-      // With history present, replaying ring buffer frames re-appends bubbles
-      // that are already in the snapshot (DB persisted + ring buffer emitted
-      // the same turn), producing duplicates on re-entry. Live frames emitted
-      // AFTER subscribe() still flow through broadcast normally.
-      if (history.length === 0) {
-        for (const f of snapshot.frames) ws.send(JSON.stringify(f))
+      // With DB history present, replay only the live buffered tail that is
+      // newer than the durable snapshot. This keeps in-flight turns visible
+      // on mobile without duplicating already-persisted frames.
+      for (const f of selectBufferedFramesForAttach(history, snapshot)) {
+        ws.send(JSON.stringify(f))
       }
     } catch {
       /* ignore */

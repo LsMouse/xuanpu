@@ -1165,6 +1165,7 @@ const agentOps = {
     success: boolean
     sessionStatus?: 'idle' | 'busy' | 'retry'
     revertMessageID?: string | null
+    sessionId?: string
   }> => ipcRenderer.invoke('agent:reconnect', worktreePath, sessionId, hiveSessionId),
 
   // Send a prompt (response streams via onStream)

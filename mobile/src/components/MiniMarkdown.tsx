@@ -64,19 +64,19 @@ function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
 export function MiniMarkdown({ text }: { text: string }): React.JSX.Element {
   const blocks = splitBlocks(text)
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {blocks.map((b, i) =>
         b.kind === 'code' ? (
           <pre
             key={i}
-            className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 overflow-x-auto"
+            className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-3.5"
           >
-            <code className="text-xs font-mono text-zinc-200 whitespace-pre">
+            <code className="whitespace-pre text-xs font-mono leading-5 text-zinc-200">
               {b.body}
             </code>
           </pre>
         ) : (
-          <p key={i} className="whitespace-pre-wrap leading-relaxed">
+          <p key={i} className="whitespace-pre-wrap break-words leading-7">
             {renderInline(b.body, `b${i}`)}
           </p>
         )

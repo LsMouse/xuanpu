@@ -18,6 +18,7 @@ export const AgentErrorCodeValues = [
   'RUNTIME_UNAVAILABLE',
   'STEER_NOT_SUPPORTED',
   'SESSION_NOT_FOUND',
+  'SESSION_STALE',
   'INTERNAL_ERROR'
 ] as const
 

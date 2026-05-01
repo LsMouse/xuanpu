@@ -36,9 +36,9 @@ export function PromptComposer({
   }
 
   return (
-    <div className="border-t border-zinc-900 bg-zinc-950/95 backdrop-blur safe-pad-bottom">
-      <div className="p-2">
-        <div className="rounded-3xl border border-zinc-800/80 bg-zinc-900/80 shadow-[0_-8px_24px_rgba(0,0,0,0.22)]">
+    <div className="border-t border-zinc-900/90 bg-zinc-950/92 backdrop-blur-xl safe-pad-bottom">
+      <div className="p-2.5">
+        <div className="rounded-[30px] border border-zinc-800/80 bg-zinc-900/88 shadow-[0_-12px_40px_rgba(0,0,0,0.3)]">
           <div className="px-3 pt-3 pb-2">
             <textarea
               ref={taRef}
@@ -48,19 +48,19 @@ export function PromptComposer({
               placeholder={connected ? '输入消息…' : '连接中…'}
               disabled={!connected}
               rows={1}
-              className="min-h-[44px] max-h-[32svh] w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-950 px-3.5 py-3 text-[15px] leading-6 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 disabled:opacity-60"
+              className="min-h-[48px] max-h-[32svh] w-full resize-none rounded-[22px] border border-zinc-800 bg-zinc-950 px-4 py-3.5 text-[16px] leading-6 text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-zinc-600 disabled:opacity-60"
             />
           </div>
 
-          <div className="flex flex-col gap-2.5 px-3 pb-3 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between">
-            <div className="min-w-0 text-[11px] leading-4 text-zinc-500">
+          <div className="flex items-center justify-between gap-3 px-3 pb-3">
+            <div className="min-w-0 text-xs leading-4 text-zinc-500">
               {busy ? '正在生成回复，可随时中断' : connected ? 'Shift + Enter 换行' : '等待连接恢复'}
             </div>
 
             {busy ? (
               <button
                 onClick={() => stream.interrupt()}
-                className="inline-flex h-11 w-full min-w-[88px] items-center justify-center rounded-full bg-red-900/70 px-4 text-sm font-medium text-red-100 shadow-sm transition active:scale-[0.98] active:bg-red-900 shrink-0 min-[380px]:w-auto"
+                className="inline-flex h-12 min-w-[92px] shrink-0 items-center justify-center rounded-full bg-red-900/70 px-5 text-sm font-semibold text-red-100 shadow-sm transition active:scale-[0.98] active:bg-red-900"
                 title="中断"
               >
                 中断
@@ -69,7 +69,7 @@ export function PromptComposer({
               <button
                 onClick={onSend}
                 disabled={!canSend}
-                className="inline-flex h-11 w-full min-w-[88px] items-center justify-center rounded-full bg-zinc-100 px-4 text-sm font-semibold text-zinc-900 shadow-sm transition active:scale-[0.98] active:bg-zinc-200 disabled:opacity-40 disabled:active:scale-100 shrink-0 min-[380px]:w-auto"
+                className="inline-flex h-12 min-w-[92px] shrink-0 items-center justify-center rounded-full bg-zinc-100 px-5 text-sm font-semibold text-zinc-950 shadow-sm transition active:scale-[0.98] active:bg-white disabled:opacity-40 disabled:active:scale-100"
               >
                 发送
               </button>

@@ -232,13 +232,13 @@ function Card({
   return (
     <div
       className={
-        'px-3 py-2 rounded-lg border ' +
+        'rounded-2xl border px-3.5 py-3 ' +
         (isError
           ? 'bg-red-950/30 border-red-900/60'
           : 'bg-zinc-900 border-zinc-800')
       }
     >
-      <div className="flex items-center gap-2 mb-1">
+      <div className="mb-2 flex items-center gap-2">
         <span className="text-xs font-mono text-zinc-500 w-4 text-center">{icon}</span>
         <span className="text-xs uppercase tracking-wider text-zinc-500">{label}</span>
         {pending && <span className="ml-auto text-xs text-amber-400">运行中…</span>}

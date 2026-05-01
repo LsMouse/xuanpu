@@ -104,4 +104,33 @@ describe('useSessionStream', () => {
     expect(result.current.state.plan).toBeNull()
     expect(result.current.state.commandApproval).toBeNull()
   })
+
+  it('ignores duplicate message/append frames for the same message id', () => {
+    const { result } = renderHook(() => useSessionStream('device-1', 'hive-1'))
+    const latestSocket = wsMock.getLatestSocket()
+    expect(latestSocket).not.toBeNull()
+
+    const message = {
+      id: 'msg-1',
+      role: 'assistant' as const,
+      ts: 1_700_000_000_000,
+      seq: 1,
+      parts: [{ type: 'text' as const, text: 'hello' }]
+    }
+
+    act(() => {
+      latestSocket?.emitFrame({
+        type: 'message/append',
+        seq: 1,
+        message
+      })
+      latestSocket?.emitFrame({
+        type: 'message/append',
+        seq: 2,
+        message
+      })
+    })
+
+    expect(result.current.state.messages).toEqual([message])
+  })
 })
