@@ -27,7 +27,46 @@ beforeEach(() => {
   })
 })
 
+type SpeechEventHandler = ((event?: unknown) => void) | null
+
+class FakeSpeechRecognition {
+  static instances: FakeSpeechRecognition[] = []
+
+  continuous = false
+  interimResults = false
+  lang = ''
+  onend: SpeechEventHandler = null
+  onerror: SpeechEventHandler = null
+  onresult: SpeechEventHandler = null
+  start = vi.fn()
+  stop = vi.fn(() => {
+    this.onend?.()
+  })
+
+  constructor() {
+    FakeSpeechRecognition.instances.push(this)
+  }
+}
+
+function emitResult(instance: FakeSpeechRecognition, text: string, isFinal: boolean): void {
+  instance.onresult?.({
+    resultIndex: 0,
+    results: [
+      {
+        isFinal,
+        0: { transcript: text }
+      }
+    ]
+  })
+}
+
 describe('ComposerBar', () => {
+  beforeEach(() => {
+    FakeSpeechRecognition.instances = []
+    Reflect.deleteProperty(window, 'SpeechRecognition')
+    Reflect.deleteProperty(window, 'webkitSpeechRecognition')
+  })
+
   it('uses queue as the primary action while busy when draft content exists', async () => {
     const user = userEvent.setup()
     const onAction = vi.fn()
@@ -64,6 +103,7 @@ describe('ComposerBar', () => {
         firstInterrupt={null}
         onAction={vi.fn()}
         isConnected={true}
+        supportsSteer={true}
       />
     )
 
@@ -88,6 +128,7 @@ describe('ComposerBar', () => {
         firstInterrupt={null}
         onAction={onAction}
         isConnected={true}
+        supportsSteer={true}
       />
     )
 
@@ -104,5 +145,50 @@ describe('ComposerBar', () => {
       'Switch to investigating the failing test',
       expect.any(Array)
     )
+  })
+
+  it('renders a disabled voice button when speech recognition is unavailable', () => {
+    render(
+      <ComposerBar
+        sessionId="sess-1"
+        lifecycle="idle"
+        pendingCount={0}
+        firstInterrupt={null}
+        onAction={vi.fn()}
+        isConnected={true}
+      />
+    )
+
+    expect(screen.getByTestId('composer-voice-input')).toBeDisabled()
+  })
+
+  it('appends final voice transcript into the textarea', async () => {
+    Object.defineProperty(window, 'webkitSpeechRecognition', {
+      writable: true,
+      configurable: true,
+      value: FakeSpeechRecognition
+    })
+
+    const user = userEvent.setup()
+    render(
+      <ComposerBar
+        sessionId="sess-1"
+        lifecycle="idle"
+        pendingCount={0}
+        firstInterrupt={null}
+        onAction={vi.fn()}
+        isConnected={true}
+      />
+    )
+
+    await user.type(screen.getByRole('textbox'), 'Hello')
+    await user.click(screen.getByTestId('composer-voice-input'))
+
+    const instance = FakeSpeechRecognition.instances[0]
+    act(() => {
+      emitResult(instance, 'world', true)
+    })
+
+    expect(screen.getByRole('textbox')).toHaveValue('Hello world')
   })
 })

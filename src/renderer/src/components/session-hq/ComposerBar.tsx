@@ -7,13 +7,24 @@
  */
 
 import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react'
-import { ArrowUp, Square, CornerDownLeft, ListPlus, Workflow, ChevronDown } from 'lucide-react'
+import {
+  ArrowUp,
+  Square,
+  CornerDownLeft,
+  ListPlus,
+  Workflow,
+  ChevronDown,
+  Mic,
+  MicOff
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AttachmentButton } from '../sessions/AttachmentButton'
 import { AttachmentPreview, type Attachment } from '../sessions/AttachmentPreview'
 import { SlashCommandPopover } from '../sessions/SlashCommandPopover'
 import { BUILT_IN_SLASH_COMMANDS } from '../sessions/SessionView'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/lib/toast'
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,6 +129,24 @@ export function ComposerBar({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [content, setContent] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const appendTranscript = useCallback((transcript: string) => {
+    setContent((current) => {
+      const trimmedCurrent = current.trimEnd()
+      if (!trimmedCurrent) return transcript
+      return `${trimmedCurrent} ${transcript}`
+    })
+  }, [])
+  const {
+    isSupported: isVoiceSupported,
+    isListening: isVoiceListening,
+    interimTranscript,
+    error: voiceError,
+    unavailableReason,
+    startListening,
+    stopListening
+  } = useSpeechRecognition({
+    onFinalTranscript: appendTranscript
+  })
 
   // --- Draft persistence: save input on unmount/switch, restore on mount ---
   const contentRef = useRef(content)
@@ -196,6 +225,19 @@ export function ComposerBar({
   useEffect(() => {
     textareaRef.current?.focus()
   }, [sessionId])
+
+  useEffect(() => {
+    if (!voiceError) return
+
+    const message =
+      voiceError === 'not-allowed' || voiceError === 'service-not-allowed'
+        ? 'Microphone permission was denied'
+        : voiceError === 'no-speech'
+          ? 'No speech detected'
+          : 'Voice input stopped unexpectedly'
+
+    toast.error(message)
+  }, [voiceError])
 
   const clearInput = useCallback(() => {
     setContent('')
@@ -322,6 +364,12 @@ export function ComposerBar({
         : actionSet.iconHint === 'stop'
           ? 'Type to stop and send...'
           : 'Type a message...'
+  const voiceButtonTitle = !isVoiceSupported
+    ? unavailableReason ?? 'Voice input unavailable'
+    : isVoiceListening
+      ? 'Stop voice input'
+      : 'Start voice input'
+  const voiceButtonDisabled = !isVoiceSupported || isDisabled
 
   // Determine if button should be enabled
   const buttonEnabled =
@@ -387,6 +435,14 @@ export function ComposerBar({
           )}
           rows={1}
         />
+        {isVoiceListening && interimTranscript && (
+          <div
+            className="mt-2 text-xs text-muted-foreground"
+            data-testid="composer-voice-interim"
+          >
+            {interimTranscript}
+          </div>
+        )}
       </div>
 
       {/* Bottom row: attach + plan + spacer + send */}
@@ -395,6 +451,34 @@ export function ComposerBar({
           onAttach={handleAttach}
           disabled={isDisabled}
         />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'h-7 w-7 rounded-full border p-0',
+            isVoiceListening
+              ? 'border-emerald-400/70 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+              : 'border-border/70'
+          )}
+          disabled={voiceButtonDisabled}
+          onClick={() => {
+            if (isVoiceListening) {
+              stopListening()
+              return
+            }
+            startListening()
+          }}
+          title={voiceButtonTitle}
+          aria-label={voiceButtonTitle}
+          data-testid="composer-voice-input"
+        >
+          {isVoiceSupported ? (
+            <Mic className="h-3.5 w-3.5" />
+          ) : (
+            <MicOff className="h-3.5 w-3.5" />
+          )}
+        </Button>
 
         {/* Plan mode toggle */}
         {pendingPlan ? (
