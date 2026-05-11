@@ -78,6 +78,46 @@ import { useSessionSmartScroll } from '@/hooks/useSessionSmartScroll'
 import { toast } from 'sonner'
 import { isTodoWriteTool } from '@/components/sessions/tools/todo-utils'
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
+}
+
+function extractTextFromUnknownParts(parts: unknown): string {
+  if (!Array.isArray(parts)) return ''
+  return parts
+    .map((part) => {
+      const record = asRecord(part)
+      if (!record || record.type !== 'text') return ''
+      return asString(record.text) ?? ''
+    })
+    .join('')
+}
+
+function createHubMobilePromptTimelineMessage(
+  data: unknown,
+  eventId: string
+): TimelineMessage | null {
+  const record = asRecord(data)
+  if (!record) return null
+
+  const info = asRecord(record.info)
+  if (info?.origin !== 'hub-mobile') return null
+
+  const content = asString(record.content) ?? extractTextFromUnknownParts(record.parts)
+  if (!content.trim()) return null
+
+  return {
+    id: asString(record.id) ?? `mobile-${eventId}`,
+    role: 'user',
+    content,
+    timestamp: asString(info.timestamp) ?? new Date().toISOString()
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Extract mission tasks from committed timeline messages
 // ---------------------------------------------------------------------------
@@ -448,7 +488,8 @@ export function SessionShell({ sessionId }: SessionShellProps): React.JSX.Elemen
       sessionId,
       (current) => ({
         ...current,
-        optimisticMessages: optimisticRef.current.length > 0 ? [...optimisticRef.current] : undefined
+        optimisticMessages:
+          optimisticRef.current.length > 0 ? [...optimisticRef.current] : undefined
       }),
       { notify: 'immediate' }
     )
@@ -867,12 +908,21 @@ export function SessionShell({ sessionId }: SessionShellProps): React.JSX.Elemen
                 async (wp, sid, message) => {
                   let messageParts: MessagePart[] | undefined
                   if (message.attachments.length > 0) {
-                    messageParts = await buildMessageParts(message.attachments as Attachment[], message.content)
+                    messageParts = await buildMessageParts(
+                      message.attachments as Attachment[],
+                      message.content
+                    )
                   }
-                  return window.agentOps.prompt(wp, sid, messageParts ?? message.content, requestModel)
+                  return window.agentOps.prompt(
+                    wp,
+                    sid,
+                    messageParts ?? message.content,
+                    requestModel
+                  )
                 },
                 worktreePath,
-                (sid, message) => useSessionRuntimeStore.getState().requeueMessageFront(sid, message)
+                (sid, message) =>
+                  useSessionRuntimeStore.getState().requeueMessageFront(sid, message)
               ).catch((err) => console.error('[SessionShell] drainNextPending failed:', err))
             }
           }
@@ -880,6 +930,18 @@ export function SessionShell({ sessionId }: SessionShellProps): React.JSX.Elemen
 
         // Token / cost tracking (active session — global bridge skips the active one)
         if (event.type === 'message.updated') {
+          const remoteUserPrompt = createHubMobilePromptTimelineMessage(event.data, event.eventId)
+          if (remoteUserPrompt) {
+            if (
+              !timelineMessagesRef.current.some((message) => message.id === remoteUserPrompt.id)
+            ) {
+              appendOptimistic(remoteUserPrompt)
+              timelineMessagesRef.current = [...timelineMessagesRef.current, remoteUserPrompt]
+              syncOptimisticMessagesToMirror()
+            }
+            return
+          }
+
           const info = (event.data as Record<string, unknown>)?.info as
             | Record<string, unknown>
             | undefined
@@ -949,15 +1011,21 @@ export function SessionShell({ sessionId }: SessionShellProps): React.JSX.Elemen
     refresh,
     worktreePath,
     droidSessionId,
+    appendOptimistic,
     optimisticRef,
     currentProviderId,
     requestModel,
-    refreshUsageSummary
+    refreshUsageSummary,
+    syncOptimisticMessagesToMirror
   ])
 
   // --- Composer action handler ---
   const handleComposerAction = useCallback(
-    async (action: ComposerAction, content: string, attachments: Attachment[]): Promise<boolean> => {
+    async (
+      action: ComposerAction,
+      content: string,
+      attachments: Attachment[]
+    ): Promise<boolean> => {
       if (!worktreePath || !droidSessionId) return false
       let optimisticMessageId: string | null = null
 
@@ -1026,7 +1094,9 @@ export function SessionShell({ sessionId }: SessionShellProps): React.JSX.Elemen
       } catch (err) {
         console.error('[SessionShell] action failed:', err)
         if (optimisticMessageId) {
-          optimisticRef.current = optimisticRef.current.filter((msg) => msg.id !== optimisticMessageId)
+          optimisticRef.current = optimisticRef.current.filter(
+            (msg) => msg.id !== optimisticMessageId
+          )
           timelineMessagesRef.current = timelineMessagesRef.current.filter(
             (msg) => msg.id !== optimisticMessageId
           )
@@ -1053,11 +1123,11 @@ export function SessionShell({ sessionId }: SessionShellProps): React.JSX.Elemen
 
   const canEditUserMessage = useCallback(
     (message: TimelineMessage) =>
-      message.role === 'user'
-      && message.id === lastUserMessageId
-      && !isStreaming
-      && lifecycle !== 'busy'
-      && lifecycle !== 'materializing',
+      message.role === 'user' &&
+      message.id === lastUserMessageId &&
+      !isStreaming &&
+      lifecycle !== 'busy' &&
+      lifecycle !== 'materializing',
     [lastUserMessageId, isStreaming, lifecycle]
   )
 
@@ -1085,8 +1155,8 @@ export function SessionShell({ sessionId }: SessionShellProps): React.JSX.Elemen
 
       setMessages(trimmedMessages)
       timelineMessagesRef.current = trimmedMessages
-      optimisticRef.current = optimisticRef.current.filter(
-        (message) => trimmedMessages.some((candidate) => candidate.id === message.id)
+      optimisticRef.current = optimisticRef.current.filter((message) =>
+        trimmedMessages.some((candidate) => candidate.id === message.id)
       )
       syncOptimisticMessagesToMirror()
       setEditingMessageId(null)

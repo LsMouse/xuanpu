@@ -217,7 +217,13 @@ describe('OpenCode Resolvers — Integration Tests', () => {
         }) { success }}
       `)
       expect(result.data.opencodePrompt.success).toBe(true)
-      expect(mockOpenCodeService.prompt).toHaveBeenCalled()
+      expect(mockOpenCodeService.prompt).toHaveBeenCalledWith(
+        '/tmp/test',
+        'oc-session-1',
+        [{ type: 'text', text: 'Hello world' }],
+        undefined,
+        { waitForCompletion: true }
+      )
     })
   })
 

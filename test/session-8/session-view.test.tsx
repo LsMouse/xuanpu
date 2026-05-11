@@ -1386,6 +1386,38 @@ describe('Session 8: Session View', () => {
       })
     })
 
+    test('mobile-originated prompt event renders as a user message', async () => {
+      render(<SessionView sessionId="test-session-1" />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('message-list')).toBeInTheDocument()
+      })
+
+      act(() => {
+        useSessionRuntimeStore.getState().dispatchToSession('test-session-1', {
+          eventId: 'evt-mobile-prompt',
+          sessionSequence: 1,
+          runEpoch: 1,
+          sessionId: 'test-session-1',
+          type: 'message.updated',
+          data: {
+            id: 'mobile-c1',
+            role: 'user',
+            content: '来自手机的问题',
+            parts: [{ type: 'text', text: '来自手机的问题' }],
+            info: {
+              origin: 'hub-mobile',
+              timestamp: '2026-05-10T12:00:00.000Z'
+            }
+          }
+        })
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('来自手机的问题')).toBeInTheDocument()
+      })
+    })
+
     test('busy status clears retry and session error banners', async () => {
       render(<SessionView sessionId="test-session-1" />)
 

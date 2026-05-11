@@ -5,17 +5,11 @@ describe('SessionShell thread status flow (source verification)', () => {
     const fs = await import('fs')
     const path = await import('path')
     const shellSource = fs.readFileSync(
-      path.resolve(
-        __dirname,
-        '../../src/renderer/src/components/session-hq/SessionShell.tsx'
-      ),
+      path.resolve(__dirname, '../../src/renderer/src/components/session-hq/SessionShell.tsx'),
       'utf-8'
     )
     const runtimeSource = fs.readFileSync(
-      path.resolve(
-        __dirname,
-        '../../src/renderer/src/stores/useSessionRuntimeStore.ts'
-      ),
+      path.resolve(__dirname, '../../src/renderer/src/stores/useSessionRuntimeStore.ts'),
       'utf-8'
     )
 
@@ -31,10 +25,7 @@ describe('SessionShell thread status flow (source verification)', () => {
     const fs = await import('fs')
     const path = await import('path')
     const source = fs.readFileSync(
-      path.resolve(
-        __dirname,
-        '../../src/renderer/src/components/session-hq/SessionShell.tsx'
-      ),
+      path.resolve(__dirname, '../../src/renderer/src/components/session-hq/SessionShell.tsx'),
       'utf-8'
     )
 
@@ -43,31 +34,26 @@ describe('SessionShell thread status flow (source verification)', () => {
     expect(source).toContain('hasDurableCompactionMessage')
   })
 
-  test('clears active overlays in finally while preserving compaction chips', async () => {
+  test('refreshes durable history on idle without clearing the readable live overlay', async () => {
     const fs = await import('fs')
     const path = await import('path')
     const source = fs.readFileSync(
-      path.resolve(
-        __dirname,
-        '../../src/renderer/src/components/session-hq/SessionShell.tsx'
-      ),
+      path.resolve(__dirname, '../../src/renderer/src/components/session-hq/SessionShell.tsx'),
       'utf-8'
     )
 
     expect(source).toContain('void refresh()')
     expect(source).toContain('.finally(() => {')
-    expect(source).toContain('clearStreamingBufferOverlay(sessionId, {')
-    expect(source).toContain('preserveCompactionState: true')
+    expect(source).toContain('optimisticRef.current = []')
+    expect(source).toContain('do NOT clearStreamingBufferOverlay here')
+    expect(source).toContain('resetLiveOverlay(true)')
   })
 
   test('wires new UI user-message edit and fork flows into AgentTimeline', async () => {
     const fs = await import('fs')
     const path = await import('path')
     const source = fs.readFileSync(
-      path.resolve(
-        __dirname,
-        '../../src/renderer/src/components/session-hq/SessionShell.tsx'
-      ),
+      path.resolve(__dirname, '../../src/renderer/src/components/session-hq/SessionShell.tsx'),
       'utf-8'
     )
 
@@ -87,15 +73,14 @@ describe('SessionShell thread status flow (source verification)', () => {
     const fs = await import('fs')
     const path = await import('path')
     const source = fs.readFileSync(
-      path.resolve(
-        __dirname,
-        '../../src/renderer/src/components/session-hq/SessionShell.tsx'
-      ),
+      path.resolve(__dirname, '../../src/renderer/src/components/session-hq/SessionShell.tsx'),
       'utf-8'
     )
 
     expect(source).toContain("import { ScrollToBottomFab } from '../sessions/ScrollToBottomFab'")
-    expect(source).toContain("import { useSessionSmartScroll } from '@/hooks/useSessionSmartScroll'")
+    expect(source).toContain(
+      "import { useSessionSmartScroll } from '@/hooks/useSessionSmartScroll'"
+    )
     expect(source).toContain('const smartScroll = useSessionSmartScroll({')
     expect(source).toContain('count={smartScroll.scrollFabCount}')
     expect(source).toContain('scrollContainerRef={smartScroll.scrollContainerRef}')

@@ -72,8 +72,14 @@ export const opencodeMutationResolvers: Resolvers = {
         await withSdkDispatch(
           ctx,
           opencodeSessionId,
-          () => openCodeService.prompt(worktreePath, opencodeSessionId, messageParts, model),
-          (impl) => impl.prompt(worktreePath, opencodeSessionId, messageParts, model)
+          () =>
+            openCodeService.prompt(worktreePath, opencodeSessionId, messageParts, model, {
+              waitForCompletion: true
+            }),
+          (impl) =>
+            impl.prompt(worktreePath, opencodeSessionId, messageParts, model, {
+              waitForCompletion: true
+            })
         )
         return { success: true }
       } catch (error) {

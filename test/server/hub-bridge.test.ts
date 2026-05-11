@@ -36,6 +36,23 @@ function makeWs(): HubSubscriber & { sent: unknown[] } {
   }
 }
 
+function makeDesktopWindow(): {
+  sent: Array<[string, unknown]>
+  isDestroyed: () => boolean
+  webContents: { send: (channel: string, payload: unknown) => void }
+} {
+  const sent: Array<[string, unknown]> = []
+  return {
+    sent,
+    isDestroyed: () => false,
+    webContents: {
+      send: (channel: string, payload: unknown) => {
+        sent.push([channel, payload])
+      }
+    }
+  }
+}
+
 function makeRuntimeStub(overrides: Partial<AgentRuntimeAdapter> = {}): {
   runtime: AgentRuntimeAdapter
   manager: AgentRuntimeManager
@@ -376,13 +393,135 @@ describe('hub-bridge: inbound client messages', () => {
     bridge.registerSessionRouting('s1', '/wt', 'agent-1')
 
     const ws = makeWs()
+    registry.subscribe(ws, 'd', 's1')
     await bridge.handleClientMessage(ws, 's1', {
       type: 'prompt',
       clientMsgId: 'c1',
       text: 'do thing'
     })
-    expect(runtime.prompt).toHaveBeenCalledWith('/wt', 'agent-1', 'do thing')
-    expect(ws.sent).toHaveLength(0)
+    expect(runtime.prompt).toHaveBeenCalledWith('/wt', 'agent-1', 'do thing', undefined, {
+      waitForCompletion: true
+    })
+    expect(ws.sent[0]).toMatchObject({
+      type: 'message/append',
+      message: {
+        id: 'mobile-c1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'do thing' }]
+      }
+    })
+    expect(ws.sent[1]).toMatchObject({ type: 'status', status: 'busy' })
+  })
+
+  it('broadcasts a mobile user prompt before waiting for the runtime response', async () => {
+    const registry = new HubRegistry({ localDeviceId: 'd' })
+    const { runtime, manager } = makeRuntimeStub()
+    const desktopWindow = makeDesktopWindow()
+    let finishPrompt: (() => void) | null = null
+    vi.mocked(runtime.prompt).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishPrompt = resolve
+        })
+    )
+    const bridge = new HubBridge({
+      registry,
+      runtimeManager: manager,
+      desktopWindow,
+      now: () => 1_700_000_000_000
+    })
+    bridge.registerSessionRouting('s1', '/wt', 'agent-1')
+
+    const sender = makeWs()
+    const observer = makeWs()
+    registry.subscribe(sender, 'd', 's1')
+    registry.subscribe(observer, 'd', 's1')
+
+    const pending = bridge.handleClientMessage(sender, 's1', {
+      type: 'prompt',
+      clientMsgId: 'c-mobile',
+      text: 'hello from phone'
+    })
+    await Promise.resolve()
+
+    expect(runtime.prompt).toHaveBeenCalledTimes(1)
+    expect(sender.sent[0]).toMatchObject({
+      type: 'message/append',
+      seq: 1,
+      message: {
+        id: 'mobile-c-mobile',
+        role: 'user',
+        ts: 1_700_000_000_000,
+        seq: 1,
+        parts: [{ type: 'text', text: 'hello from phone' }]
+      }
+    })
+    expect(observer.sent[0]).toEqual(sender.sent[0])
+    expect(sender.sent[1]).toMatchObject({ type: 'status', seq: 2, status: 'busy' })
+    expect(desktopWindow.sent[0]).toEqual([
+      'agent:stream',
+      expect.objectContaining({
+        type: 'message.updated',
+        sessionId: 's1',
+        runtimeId: 'claude-code',
+        data: {
+          id: 'mobile-c-mobile',
+          role: 'user',
+          content: 'hello from phone',
+          parts: [{ type: 'text', text: 'hello from phone' }],
+          info: {
+            origin: 'hub-mobile',
+            timestamp: '2023-11-14T22:13:20.000Z'
+          }
+        }
+      })
+    ])
+
+    finishPrompt?.()
+    await pending
+  })
+
+  it('marks mobile prompts busy immediately and rejects another prompt until the turn finishes', async () => {
+    const registry = new HubRegistry({ localDeviceId: 'd' })
+    const { runtime, manager } = makeRuntimeStub()
+    let finishPrompt: (() => void) | null = null
+    vi.mocked(runtime.prompt).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishPrompt = resolve
+        })
+    )
+    const bridge = new HubBridge({ registry, runtimeManager: manager })
+    bridge.registerSessionRouting('s1', '/wt', 'agent-1')
+    const ws = makeWs()
+    registry.subscribe(ws, 'd', 's1')
+
+    const first = bridge.handleClientMessage(ws, 's1', {
+      type: 'prompt',
+      clientMsgId: 'c1',
+      text: 'first'
+    })
+    await Promise.resolve()
+
+    expect(registry.getSession('d', 's1')?.status).toBe('busy')
+    expect(ws.sent[0]).toMatchObject({ type: 'message/append' })
+    expect(ws.sent[1]).toMatchObject({ type: 'status', status: 'busy' })
+
+    await bridge.handleClientMessage(ws, 's1', {
+      type: 'prompt',
+      clientMsgId: 'c2',
+      text: 'second'
+    })
+
+    expect(runtime.prompt).toHaveBeenCalledTimes(1)
+    expect(ws.sent.at(-1)).toMatchObject({
+      type: 'error',
+      code: 'RATE_LIMITED',
+      message: 'session is busy'
+    })
+
+    finishPrompt?.()
+    await first
   })
 
   it('interrupt → runtime.abort', async () => {
@@ -465,7 +604,9 @@ describe('hub-bridge: routingResolver lazy fallback', () => {
     })
 
     expect(resolver).toHaveBeenCalledTimes(1)
-    expect(runtime.prompt).toHaveBeenCalledWith('/tmp/wt', 'agent-42', 'hi')
+    expect(runtime.prompt).toHaveBeenCalledWith('/tmp/wt', 'agent-42', 'hi', undefined, {
+      waitForCompletion: true
+    })
     expect(ws.sent).toEqual([])
 
     // Second call should hit the cache, not the resolver again.

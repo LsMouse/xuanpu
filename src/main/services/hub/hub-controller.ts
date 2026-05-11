@@ -104,6 +104,7 @@ export class HubController extends EventEmitter {
     this.bridge = createHubBridge({
       registry: this.registry,
       runtimeManager: opts.runtimeManager,
+      desktopWindow: opts.mainWindow,
       // No callsite ever invokes registerSessionRouting() in M1 — the bridge
       // would always answer SESSION_NOT_FOUND otherwise. Resolution order:
       // (1) try every implementer's in-memory `findRoutingByHive` for a

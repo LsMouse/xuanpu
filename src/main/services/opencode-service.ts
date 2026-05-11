@@ -5,8 +5,11 @@ import { notificationService } from './notification-service'
 import { getDatabase } from '../db'
 import { autoRenameWorktreeBranch } from './git-service'
 import { getEventBus } from '../../server/event-bus'
-import type { AgentSdkImplementer } from './agent-runtime-types'
-import type { AgentRuntimeAdapter } from './agent-runtime-types'
+import type {
+  AgentSdkImplementer,
+  AgentRuntimeAdapter,
+  PromptOptions
+} from './agent-runtime-types'
 import { beginSessionRun, emitAgentEvent } from '@shared/lib/normalize-agent-event'
 import {
   resolveOpenCodeLaunchSpec,
@@ -683,7 +686,8 @@ class OpenCodeService implements AgentSdkImplementer, AgentRuntimeAdapter {
           | { type: 'text'; text: string }
           | { type: 'file'; mime: string; url: string; filename?: string }
         >,
-    modelOverride?: { providerID: string; modelID: string; variant?: string }
+    modelOverride?: { providerID: string; modelID: string; variant?: string },
+    options?: PromptOptions
   ): Promise<void> {
     const parts =
       typeof messageOrParts === 'string'
@@ -711,8 +715,11 @@ class OpenCodeService implements AgentSdkImplementer, AgentRuntimeAdapter {
     log.info('Using model for prompt', { model, variant })
 
     try {
-      // Use promptAsync for non-blocking behavior - events will stream the response
-      await this.instance.client.session.promptAsync({
+      const promptMethod = options?.waitForCompletion
+        ? this.instance.client.session.prompt
+        : this.instance.client.session.promptAsync
+
+      await promptMethod.call(this.instance.client.session, {
         path: { id: opencodeSessionId },
         query: { directory: worktreePath },
         body: {
@@ -722,7 +729,10 @@ class OpenCodeService implements AgentSdkImplementer, AgentRuntimeAdapter {
         }
       })
 
-      log.info('Prompt sent successfully', { opencodeSessionId })
+      log.info('Prompt sent successfully', {
+        opencodeSessionId,
+        waitForCompletion: options?.waitForCompletion === true
+      })
     } catch (error) {
       log.error('Failed to send prompt', { opencodeSessionId, error })
       throw error

@@ -385,6 +385,35 @@ function createLocalMessage(
   }
 }
 
+function extractTextFromUnknownParts(parts: unknown): string {
+  if (!Array.isArray(parts)) return ''
+  return parts
+    .map((part) => {
+      const record = asRecord(part)
+      if (!record || record.type !== 'text') return ''
+      return asString(record.text) ?? ''
+    })
+    .join('')
+}
+
+function createRemoteUserPromptMessage(data: unknown, eventId: string): OpenCodeMessage | null {
+  const record = asRecord(data)
+  if (!record) return null
+
+  const info = asRecord(record.info)
+  if (info?.origin !== 'hub-mobile') return null
+
+  const content = asString(record.content) ?? extractTextFromUnknownParts(record.parts)
+  if (!content.trim()) return null
+
+  return {
+    id: asString(record.id) ?? `mobile-${eventId}`,
+    role: 'user',
+    content,
+    timestamp: asString(info.timestamp) ?? new Date().toISOString()
+  }
+}
+
 /** Extract file-type MessageParts from local Attachment state for display in user bubbles */
 function toFilePartsForDisplay(attachments: Attachment[]): MessagePart[] {
   return attachments
@@ -2508,6 +2537,15 @@ export function SessionView({ sessionId }: SessionViewProps): React.JSX.Element 
             setIsStreaming(true)
           }
         } else if (event.type === 'message.updated') {
+          const remoteUserPrompt = createRemoteUserPromptMessage(event.data, event.eventId)
+          if (remoteUserPrompt) {
+            setMessages((prev) => {
+              if (prev.some((message) => message.id === remoteUserPrompt.id)) return prev
+              return [...prev, remoteUserPrompt]
+            })
+            return
+          }
+
           // Skip user-message echoes
           if (eventRole === 'user') return
 

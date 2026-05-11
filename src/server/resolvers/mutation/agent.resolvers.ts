@@ -72,8 +72,14 @@ export const agentMutationResolvers: Resolvers = {
         await withRuntimeDispatch(
           ctx,
           runtimeSessionId,
-          () => openCodeService.prompt(worktreePath, runtimeSessionId, messageParts, model),
-          (impl) => impl.prompt(worktreePath, runtimeSessionId, messageParts, model)
+          () =>
+            openCodeService.prompt(worktreePath, runtimeSessionId, messageParts, model, {
+              waitForCompletion: true
+            }),
+          (impl) =>
+            impl.prompt(worktreePath, runtimeSessionId, messageParts, model, {
+              waitForCompletion: true
+            })
         )
         return { success: true }
       } catch (error) {

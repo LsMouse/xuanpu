@@ -28,8 +28,9 @@
 
 import type { BrowserWindow, WebContents } from 'electron'
 import type { CanonicalAgentEvent } from '../../../shared/types/agent-protocol'
+import { emitAgentEvent } from '../../../shared/lib/normalize-agent-event'
 import type { AgentRuntimeManager } from '../agent-runtime-manager'
-import type { AgentRuntimeAdapter } from '../agent-runtime-types'
+import type { AgentRuntimeAdapter, PromptOptions } from '../agent-runtime-types'
 import type {
   TimelineMessage,
   StreamingPart,
@@ -52,6 +53,7 @@ import { createLogger } from '../logger'
 const log = createLogger({ component: 'HubBridge' })
 
 export const AGENT_STREAM_CHANNEL = 'agent:stream'
+const REMOTE_PROMPT_OPTIONS: PromptOptions = { waitForCompletion: true }
 
 export interface HubBridgeOptions {
   registry: HubRegistry
@@ -74,6 +76,8 @@ export interface HubBridgeOptions {
       >
   /** Override for tests. */
   now?: () => number
+  /** Optional desktop target for mobile-originated prompt echoes. */
+  desktopWindow?: BrowserWindowLike
   /** Defaults to 'claude-code' (M1 only supports Claude). */
   primaryRuntimeId?: AgentRuntimeAdapter['id']
 }
@@ -160,6 +164,7 @@ export class HubBridge {
       >
   private readonly primaryRuntimeId: AgentRuntimeAdapter['id']
   private readonly now: () => number
+  private readonly desktopWindow?: BrowserWindowLike
   /** worktreePath per hive session — needed to call runtime methods. */
   private readonly worktreePaths = new Map<string, string>()
   /** agent-session-id per hive session. */
@@ -194,6 +199,7 @@ export class HubBridge {
     this.routingResolver = opts.routingResolver ?? (() => null)
     this.primaryRuntimeId = opts.primaryRuntimeId ?? 'claude-code'
     this.now = opts.now ?? Date.now
+    this.desktopWindow = opts.desktopWindow
   }
 
   /**
@@ -618,10 +624,33 @@ export class HubBridge {
     switch (msg.type) {
       case 'prompt': {
         if (!routing) return
+        const currentStatus = this.registry.getSession(
+          this.registry.localDeviceId,
+          hiveSessionId
+        )?.status
+        if (currentStatus === 'busy' || currentStatus === 'retry') {
+          this.emitError(ws, 'RATE_LIMITED', 'session is busy')
+          return
+        }
+        this.emitDesktopMobilePrompt(hiveSessionId, msg.clientMsgId, msg.text, routing.runtimeId)
+        this.broadcastMobilePrompt(hiveSessionId, msg.clientMsgId, msg.text)
+        this.broadcastStatus(hiveSessionId, 'busy')
         // IM-style flow: no desktop-side confirmation gate. Mobile sends,
         // we hand straight to the runtime. Authentication on the WS already
         // happened upstream; per-prompt confirm has been removed.
-        await runtime.prompt(routing.worktreePath, routing.agentSessionId, msg.text)
+        try {
+          await runtime.prompt(
+            routing.worktreePath,
+            routing.agentSessionId,
+            msg.text,
+            undefined,
+            REMOTE_PROMPT_OPTIONS
+          )
+          this.broadcastStatus(hiveSessionId, 'idle')
+        } catch (err) {
+          this.broadcastStatus(hiveSessionId, 'idle')
+          this.emitError(ws, 'INTERNAL', err instanceof Error ? err.message : String(err))
+        }
         return
       }
       case 'interrupt': {
@@ -753,6 +782,58 @@ export class HubBridge {
     } catch {
       /* ignore */
     }
+  }
+
+  private broadcastStatus(hiveSessionId: string, status: HubSessionStatus): void {
+    const deviceId = this.registry.localDeviceId
+    this.registry.setStatus(deviceId, hiveSessionId, status)
+    const seq = this.registry.nextSeq(deviceId, hiveSessionId)
+    this.registry.broadcast(deviceId, hiveSessionId, { type: 'status', seq, status })
+  }
+
+  private broadcastMobilePrompt(
+    hiveSessionId: string,
+    clientMsgId: string,
+    text: string
+  ): void {
+    const deviceId = this.registry.localDeviceId
+    const seq = this.registry.nextSeq(deviceId, hiveSessionId)
+    const message: HubMessage = {
+      id: `mobile-${clientMsgId}`,
+      role: 'user',
+      ts: this.now(),
+      seq,
+      parts: [{ type: 'text', text }]
+    }
+    this.registry.broadcast(deviceId, hiveSessionId, {
+      type: 'message/append',
+      seq,
+      message
+    })
+  }
+
+  private emitDesktopMobilePrompt(
+    hiveSessionId: string,
+    clientMsgId: string,
+    text: string,
+    runtimeId: AgentRuntimeAdapter['id']
+  ): void {
+    const timestamp = new Date(this.now()).toISOString()
+    emitAgentEvent(this.desktopWindow as unknown as BrowserWindow, {
+      type: 'message.updated',
+      sessionId: hiveSessionId,
+      runtimeId,
+      data: {
+        id: `mobile-${clientMsgId}`,
+        role: 'user',
+        content: text,
+        parts: [{ type: 'text', text }],
+        info: {
+          origin: 'hub-mobile',
+          timestamp
+        }
+      }
+    })
   }
 }
 
@@ -910,6 +991,7 @@ function translateTimelineMessage(msg: TimelineMessage, idx: number): HubMessage
 export interface CreateHubBridgeDeps {
   registry: HubRegistry
   runtimeManager: AgentRuntimeManager
+  desktopWindow?: BrowserWindowLike
   routingResolver?: (
     hiveSessionId: string
   ) =>

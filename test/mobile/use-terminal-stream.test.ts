@@ -10,7 +10,10 @@ const wsMock = vi.hoisted(() => {
     sent: unknown[] = []
 
     constructor(_deviceId: string, _worktreeId: string) {
-      latestSocket = this
+      latestSocket = {
+        emitFrame: (frame: unknown) => this.emitFrame(frame),
+        sent: this.sent
+      }
     }
 
     connect(): void {

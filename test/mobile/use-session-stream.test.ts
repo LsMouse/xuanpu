@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const wsMock = vi.hoisted(() => {
   let latestSocket: {
+    sent: unknown[]
     emitFrame: (frame: unknown) => void
   } | null = null
 
   class MockHubWebSocket {
+    readonly sent: unknown[] = []
     private frameListeners = new Set<(frame: unknown) => void>()
     private stateListeners = new Set<(state: 'connecting' | 'open' | 'closed') => void>()
 
@@ -24,7 +26,8 @@ const wsMock = vi.hoisted(() => {
 
     destroy(): void {}
 
-    send(): boolean {
+    send(frame: unknown): boolean {
+      this.sent.push(frame)
       return true
     }
 
@@ -132,5 +135,60 @@ describe('useSessionStream', () => {
     })
 
     expect(result.current.state.messages).toEqual([message])
+  })
+
+  it('appends an optimistic user bubble immediately when prompt is sent', () => {
+    const { result } = renderHook(() => useSessionStream('device-1', 'hive-1'))
+    const latestSocket = wsMock.getLatestSocket()
+    expect(latestSocket).not.toBeNull()
+
+    act(() => {
+      result.current.prompt('hello from phone')
+    })
+
+    expect(latestSocket?.sent[0]).toMatchObject({
+      type: 'prompt',
+      text: 'hello from phone'
+    })
+    expect(result.current.state.messages).toHaveLength(1)
+    expect(result.current.state.messages[0]).toMatchObject({
+      id: expect.stringMatching(/^local-cm-/),
+      role: 'user',
+      parts: [{ type: 'text', text: 'hello from phone' }]
+    })
+  })
+
+  it('replaces the local optimistic bubble when the server echoes the mobile prompt', () => {
+    const { result } = renderHook(() => useSessionStream('device-1', 'hive-1'))
+    const latestSocket = wsMock.getLatestSocket()
+    expect(latestSocket).not.toBeNull()
+
+    act(() => {
+      result.current.prompt('hello from phone')
+    })
+
+    const promptFrame = latestSocket?.sent[0] as { clientMsgId: string }
+    expect(result.current.state.messages[0]?.id).toBe(`local-${promptFrame.clientMsgId}`)
+
+    act(() => {
+      latestSocket?.emitFrame({
+        type: 'message/append',
+        seq: 1,
+        message: {
+          id: `mobile-${promptFrame.clientMsgId}`,
+          role: 'user',
+          ts: 1_700_000_000_000,
+          seq: 1,
+          parts: [{ type: 'text', text: 'hello from phone' }]
+        }
+      })
+    })
+
+    expect(result.current.state.messages).toHaveLength(1)
+    expect(result.current.state.messages[0]).toMatchObject({
+      id: `mobile-${promptFrame.clientMsgId}`,
+      role: 'user',
+      parts: [{ type: 'text', text: 'hello from phone' }]
+    })
   })
 })

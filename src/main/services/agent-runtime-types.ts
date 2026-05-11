@@ -16,6 +16,7 @@ export interface AgentRuntimeCapabilities {
 
 export interface PromptOptions {
   codexFastMode?: boolean
+  waitForCompletion?: boolean
 }
 
 export interface AgentRuntimeAdapter {
