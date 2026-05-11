@@ -120,7 +120,9 @@ class PtyService {
           )
         }
       }
-      this.ptys.delete(id)
+      if (this.ptys.get(id) === instance) {
+        this.ptys.delete(id)
+      }
     })
 
     this.ptys.set(id, instance)

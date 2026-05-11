@@ -203,6 +203,22 @@ describe('PtyService', () => {
       expect(() => ptyService.destroy('wt-kill-err')).not.toThrow()
       expect(ptyService.has('wt-kill-err')).toBe(false)
     })
+
+    test('late exit from a destroyed PTY does not remove its replacement', () => {
+      const firstPty = new MockPty(80, 24)
+      const secondPty = new MockPty(100, 30)
+      spawnMock.mockReturnValueOnce(firstPty).mockReturnValueOnce(secondPty)
+
+      ptyService.create('wt-restart', { cwd: '/tmp/first' })
+      ptyService.destroy('wt-restart')
+      ptyService.create('wt-restart', { cwd: '/tmp/second' })
+
+      firstPty.simulateExit(1, 0)
+
+      expect(ptyService.has('wt-restart')).toBe(true)
+      ptyService.write('wt-restart', 'echo still alive\n')
+      expect(secondPty.write).toHaveBeenCalledWith('echo still alive\n')
+    })
   })
 
   describe('destroyAll', () => {
