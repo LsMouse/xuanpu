@@ -12,9 +12,7 @@ const mockOpenCodeService = vi.hoisted(() => ({
   prompt: vi.fn().mockResolvedValue(undefined),
   abort: vi.fn().mockResolvedValue(true),
   getMessages: vi.fn().mockResolvedValue([{ id: '1', role: 'user', content: 'hi' }]),
-  getAvailableModels: vi
-    .fn()
-    .mockResolvedValue({ openai: [{ id: 'gpt-4', name: 'GPT-4' }] }),
+  getAvailableModels: vi.fn().mockResolvedValue({ openai: [{ id: 'gpt-4', name: 'GPT-4' }] }),
   getModelInfo: vi.fn().mockResolvedValue({
     id: 'gpt-4',
     name: 'GPT-4',
@@ -429,6 +427,7 @@ describe('OpenCode Resolvers — Integration Tests', () => {
           worktreePath: "/tmp/test", opencodeSessionId: "oc-session-1"
         }) { success sessionId }}
       `)
+      expect(result.errors).toBeUndefined()
       expect(result.data.opencodeFork.success).toBe(true)
       expect(result.data.opencodeFork.sessionId).toBe('fork-session-1')
     })
@@ -442,6 +441,7 @@ describe('OpenCode Resolvers — Integration Tests', () => {
           opencodeSessionId: "oc-session-1", title: "New Title"
         }) { success }}
       `)
+      expect(result.errors).toBeUndefined()
       expect(result.data.opencodeRenameSession.success).toBe(true)
       expect(mockOpenCodeService.renameSession).toHaveBeenCalledWith(
         'oc-session-1',

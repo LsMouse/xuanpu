@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { GraphQLResolveInfo, GraphQLScalarType, GraphQLScalarTypeConfig } from 'graphql'
 import { GraphQLContext } from '../context'
 export type Maybe<T> = T | null
@@ -22,6 +23,177 @@ export type Scalars = {
   JSON: { input: unknown; output: unknown }
 }
 
+export type AgentCapabilities = {
+  __typename?: 'AgentCapabilities'
+  supportsCommands: Scalars['Boolean']['output']
+  supportsModelSelection: Scalars['Boolean']['output']
+  supportsPartialStreaming: Scalars['Boolean']['output']
+  supportsPermissionRequests: Scalars['Boolean']['output']
+  supportsQuestionPrompts: Scalars['Boolean']['output']
+  supportsReconnect: Scalars['Boolean']['output']
+  supportsRedo: Scalars['Boolean']['output']
+  supportsUndo: Scalars['Boolean']['output']
+}
+
+export type AgentCapabilitiesResult = {
+  __typename?: 'AgentCapabilitiesResult'
+  capabilities?: Maybe<AgentCapabilities>
+  error?: Maybe<Scalars['String']['output']>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentCommand = {
+  __typename?: 'AgentCommand'
+  agent?: Maybe<Scalars['String']['output']>
+  description?: Maybe<Scalars['String']['output']>
+  hints?: Maybe<Array<Scalars['String']['output']>>
+  model?: Maybe<Scalars['String']['output']>
+  name: Scalars['String']['output']
+  source?: Maybe<Scalars['String']['output']>
+  subtask?: Maybe<Scalars['Boolean']['output']>
+  template: Scalars['String']['output']
+}
+
+export type AgentCommandInput = {
+  args: Scalars['String']['input']
+  command: Scalars['String']['input']
+  model?: InputMaybe<AgentModelInput>
+  runtimeSessionId: Scalars['String']['input']
+  worktreePath: Scalars['String']['input']
+}
+
+export type AgentCommandsResult = {
+  __typename?: 'AgentCommandsResult'
+  commands: Array<AgentCommand>
+  error?: Maybe<Scalars['String']['output']>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentConnectResult = {
+  __typename?: 'AgentConnectResult'
+  error?: Maybe<Scalars['String']['output']>
+  sessionId?: Maybe<Scalars['String']['output']>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentForkResult = {
+  __typename?: 'AgentForkResult'
+  error?: Maybe<Scalars['String']['output']>
+  sessionId?: Maybe<Scalars['String']['output']>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentForkSessionInput = {
+  messageId?: InputMaybe<Scalars['String']['input']>
+  runtimeSessionId: Scalars['String']['input']
+  worktreePath: Scalars['String']['input']
+}
+
+export type AgentMessagePartInput = {
+  filename?: InputMaybe<Scalars['String']['input']>
+  mime?: InputMaybe<Scalars['String']['input']>
+  text?: InputMaybe<Scalars['String']['input']>
+  type: Scalars['String']['input']
+  url?: InputMaybe<Scalars['String']['input']>
+}
+
+export type AgentMessagesResult = {
+  __typename?: 'AgentMessagesResult'
+  error?: Maybe<Scalars['String']['output']>
+  messages?: Maybe<Scalars['JSON']['output']>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentModelInfoResult = {
+  __typename?: 'AgentModelInfoResult'
+  error?: Maybe<Scalars['String']['output']>
+  model?: Maybe<Scalars['JSON']['output']>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentModelInput = {
+  modelID: Scalars['String']['input']
+  providerID: Scalars['String']['input']
+  variant?: InputMaybe<Scalars['String']['input']>
+}
+
+export type AgentModelsResult = {
+  __typename?: 'AgentModelsResult'
+  error?: Maybe<Scalars['String']['output']>
+  providers?: Maybe<Scalars['JSON']['output']>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentPermissionListResult = {
+  __typename?: 'AgentPermissionListResult'
+  error?: Maybe<Scalars['String']['output']>
+  permissions: Array<PermissionRequest>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentPermissionReplyInput = {
+  message?: InputMaybe<Scalars['String']['input']>
+  reply: Scalars['String']['input']
+  requestId: Scalars['String']['input']
+  worktreePath?: InputMaybe<Scalars['String']['input']>
+}
+
+export type AgentPlanApproveInput = {
+  hiveSessionId: Scalars['ID']['input']
+  requestId?: InputMaybe<Scalars['String']['input']>
+  worktreePath: Scalars['String']['input']
+}
+
+export type AgentPlanRejectInput = {
+  feedback: Scalars['String']['input']
+  hiveSessionId: Scalars['ID']['input']
+  requestId?: InputMaybe<Scalars['String']['input']>
+  worktreePath: Scalars['String']['input']
+}
+
+export type AgentPromptInput = {
+  message?: InputMaybe<Scalars['String']['input']>
+  model?: InputMaybe<AgentModelInput>
+  parts?: InputMaybe<Array<AgentMessagePartInput>>
+  runtimeSessionId: Scalars['String']['input']
+  worktreePath: Scalars['String']['input']
+}
+
+export type AgentQuestionReplyInput = {
+  answers: Array<Array<Scalars['String']['input']>>
+  requestId: Scalars['String']['input']
+  worktreePath?: InputMaybe<Scalars['String']['input']>
+}
+
+export type AgentReconnectInput = {
+  hiveSessionId: Scalars['ID']['input']
+  runtimeSessionId: Scalars['String']['input']
+  worktreePath: Scalars['String']['input']
+}
+
+export type AgentReconnectResult = {
+  __typename?: 'AgentReconnectResult'
+  error?: Maybe<Scalars['String']['output']>
+  revertMessageID?: Maybe<Scalars['String']['output']>
+  sessionStatus?: Maybe<Scalars['String']['output']>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentRedoResult = {
+  __typename?: 'AgentRedoResult'
+  error?: Maybe<Scalars['String']['output']>
+  revertMessageID?: Maybe<Scalars['String']['output']>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentRenameSessionInput = {
+  runtimeSessionId: Scalars['String']['input']
+  title: Scalars['String']['input']
+  worktreePath?: InputMaybe<Scalars['String']['input']>
+}
+
+export type AgentRuntime = 'claude_code' | 'codex' | 'opencode' | 'terminal'
+
 export type AgentSdk = 'claude_code' | 'codex' | 'opencode' | 'terminal'
 
 export type AgentSdkDetection = {
@@ -31,11 +203,45 @@ export type AgentSdkDetection = {
   opencode: Scalars['Boolean']['output']
 }
 
+export type AgentSessionInfoResult = {
+  __typename?: 'AgentSessionInfoResult'
+  error?: Maybe<Scalars['String']['output']>
+  revertDiff?: Maybe<Scalars['String']['output']>
+  revertMessageID?: Maybe<Scalars['String']['output']>
+  success: Scalars['Boolean']['output']
+}
+
+export type AgentSetModelInput = {
+  modelID: Scalars['String']['input']
+  providerID: Scalars['String']['input']
+  runtime?: InputMaybe<AgentRuntime>
+  variant?: InputMaybe<Scalars['String']['input']>
+}
+
+export type AgentUndoResult = {
+  __typename?: 'AgentUndoResult'
+  error?: Maybe<Scalars['String']['output']>
+  restoredPrompt?: Maybe<Scalars['String']['output']>
+  revertDiff?: Maybe<Scalars['String']['output']>
+  revertMessageID?: Maybe<Scalars['String']['output']>
+  success: Scalars['Boolean']['output']
+}
+
 export type AppPaths = {
   __typename?: 'AppPaths'
   home: Scalars['String']['output']
   logs: Scalars['String']['output']
   userData: Scalars['String']['output']
+}
+
+export type CanonicalAgentEvent = {
+  __typename?: 'CanonicalAgentEvent'
+  childSessionId?: Maybe<Scalars['String']['output']>
+  data: Scalars['JSON']['output']
+  runtimeId?: Maybe<Scalars['String']['output']>
+  sessionId: Scalars['String']['output']
+  statusPayload?: Maybe<SessionStatusPayload>
+  type: Scalars['String']['output']
 }
 
 export type Connection = {
@@ -1650,7 +1856,7 @@ export type WorktreeCreateResult = {
 
 export type WorktreeStatus = 'active' | 'archived'
 
-export type WithIndex<TObject> = TObject & Record<string, unknown>
+export type WithIndex<TObject> = TObject & Record<string, any>
 export type ResolversObject<TObject> = WithIndex<TObject>
 
 export type ResolverTypeWrapper<T> = Promise<T> | T
@@ -1700,8 +1906,8 @@ export interface SubscriptionSubscriberObject<
 }
 
 export interface SubscriptionResolverObject<TResult, TParent, TContext, TArgs> {
-  subscribe: SubscriptionSubscribeFn<unknown, TParent, TContext, TArgs>
-  resolve: SubscriptionResolveFn<TResult, unknown, TContext, TArgs>
+  subscribe: SubscriptionSubscribeFn<any, TParent, TContext, TArgs>
+  resolve: SubscriptionResolveFn<TResult, any, TContext, TArgs>
 }
 
 export type SubscriptionObject<TResult, TKey extends string, TParent, TContext, TArgs> =
@@ -1715,7 +1921,7 @@ export type SubscriptionResolver<
   TContext = Record<PropertyKey, never>,
   TArgs = Record<PropertyKey, never>
 > =
-  | ((...args: unknown[]) => SubscriptionObject<TResult, TKey, TParent, TContext, TArgs>)
+  | ((...args: any[]) => SubscriptionObject<TResult, TKey, TParent, TContext, TArgs>)
   | SubscriptionObject<TResult, TKey, TParent, TContext, TArgs>
 
 export type TypeResolveFn<
@@ -1750,10 +1956,38 @@ export type DirectiveResolverFn<
 
 /** Mapping between all available schema types and the resolvers types */
 export type ResolversTypes = ResolversObject<{
+  AgentCapabilities: ResolverTypeWrapper<AgentCapabilities>
+  AgentCapabilitiesResult: ResolverTypeWrapper<AgentCapabilitiesResult>
+  AgentCommand: ResolverTypeWrapper<AgentCommand>
+  AgentCommandInput: AgentCommandInput
+  AgentCommandsResult: ResolverTypeWrapper<AgentCommandsResult>
+  AgentConnectResult: ResolverTypeWrapper<AgentConnectResult>
+  AgentForkResult: ResolverTypeWrapper<AgentForkResult>
+  AgentForkSessionInput: AgentForkSessionInput
+  AgentMessagePartInput: AgentMessagePartInput
+  AgentMessagesResult: ResolverTypeWrapper<AgentMessagesResult>
+  AgentModelInfoResult: ResolverTypeWrapper<AgentModelInfoResult>
+  AgentModelInput: AgentModelInput
+  AgentModelsResult: ResolverTypeWrapper<AgentModelsResult>
+  AgentPermissionListResult: ResolverTypeWrapper<AgentPermissionListResult>
+  AgentPermissionReplyInput: AgentPermissionReplyInput
+  AgentPlanApproveInput: AgentPlanApproveInput
+  AgentPlanRejectInput: AgentPlanRejectInput
+  AgentPromptInput: AgentPromptInput
+  AgentQuestionReplyInput: AgentQuestionReplyInput
+  AgentReconnectInput: AgentReconnectInput
+  AgentReconnectResult: ResolverTypeWrapper<AgentReconnectResult>
+  AgentRedoResult: ResolverTypeWrapper<AgentRedoResult>
+  AgentRenameSessionInput: AgentRenameSessionInput
+  AgentRuntime: AgentRuntime
   AgentSdk: AgentSdk
   AgentSdkDetection: ResolverTypeWrapper<AgentSdkDetection>
+  AgentSessionInfoResult: ResolverTypeWrapper<AgentSessionInfoResult>
+  AgentSetModelInput: AgentSetModelInput
+  AgentUndoResult: ResolverTypeWrapper<AgentUndoResult>
   AppPaths: ResolverTypeWrapper<AppPaths>
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>
+  CanonicalAgentEvent: ResolverTypeWrapper<CanonicalAgentEvent>
   Connection: ResolverTypeWrapper<Connection>
   ConnectionAddMemberResult: ResolverTypeWrapper<ConnectionAddMemberResult>
   ConnectionCreateResult: ResolverTypeWrapper<ConnectionCreateResult>
@@ -1870,9 +2104,36 @@ export type ResolversTypes = ResolversObject<{
 
 /** Mapping between all available schema types and the resolvers parents */
 export type ResolversParentTypes = ResolversObject<{
+  AgentCapabilities: AgentCapabilities
+  AgentCapabilitiesResult: AgentCapabilitiesResult
+  AgentCommand: AgentCommand
+  AgentCommandInput: AgentCommandInput
+  AgentCommandsResult: AgentCommandsResult
+  AgentConnectResult: AgentConnectResult
+  AgentForkResult: AgentForkResult
+  AgentForkSessionInput: AgentForkSessionInput
+  AgentMessagePartInput: AgentMessagePartInput
+  AgentMessagesResult: AgentMessagesResult
+  AgentModelInfoResult: AgentModelInfoResult
+  AgentModelInput: AgentModelInput
+  AgentModelsResult: AgentModelsResult
+  AgentPermissionListResult: AgentPermissionListResult
+  AgentPermissionReplyInput: AgentPermissionReplyInput
+  AgentPlanApproveInput: AgentPlanApproveInput
+  AgentPlanRejectInput: AgentPlanRejectInput
+  AgentPromptInput: AgentPromptInput
+  AgentQuestionReplyInput: AgentQuestionReplyInput
+  AgentReconnectInput: AgentReconnectInput
+  AgentReconnectResult: AgentReconnectResult
+  AgentRedoResult: AgentRedoResult
+  AgentRenameSessionInput: AgentRenameSessionInput
   AgentSdkDetection: AgentSdkDetection
+  AgentSessionInfoResult: AgentSessionInfoResult
+  AgentSetModelInput: AgentSetModelInput
+  AgentUndoResult: AgentUndoResult
   AppPaths: AppPaths
   Boolean: Scalars['Boolean']['output']
+  CanonicalAgentEvent: CanonicalAgentEvent
   Connection: Connection
   ConnectionAddMemberResult: ConnectionAddMemberResult
   ConnectionCreateResult: ConnectionCreateResult
@@ -1984,6 +2245,136 @@ export type ResolversParentTypes = ResolversObject<{
   WorktreeCreateResult: WorktreeCreateResult
 }>
 
+export type AgentCapabilitiesResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentCapabilities'] =
+    ResolversParentTypes['AgentCapabilities']
+> = ResolversObject<{
+  supportsCommands?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+  supportsModelSelection?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+  supportsPartialStreaming?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+  supportsPermissionRequests?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+  supportsQuestionPrompts?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+  supportsReconnect?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+  supportsRedo?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+  supportsUndo?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentCapabilitiesResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentCapabilitiesResult'] =
+    ResolversParentTypes['AgentCapabilitiesResult']
+> = ResolversObject<{
+  capabilities?: Resolver<Maybe<ResolversTypes['AgentCapabilities']>, ParentType, ContextType>
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentCommandResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentCommand'] = ResolversParentTypes['AgentCommand']
+> = ResolversObject<{
+  agent?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  hints?: Resolver<Maybe<Array<ResolversTypes['String']>>, ParentType, ContextType>
+  model?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>
+  source?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  subtask?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>
+  template?: Resolver<ResolversTypes['String'], ParentType, ContextType>
+}>
+
+export type AgentCommandsResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentCommandsResult'] =
+    ResolversParentTypes['AgentCommandsResult']
+> = ResolversObject<{
+  commands?: Resolver<Array<ResolversTypes['AgentCommand']>, ParentType, ContextType>
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentConnectResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentConnectResult'] =
+    ResolversParentTypes['AgentConnectResult']
+> = ResolversObject<{
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  sessionId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentForkResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentForkResult'] =
+    ResolversParentTypes['AgentForkResult']
+> = ResolversObject<{
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  sessionId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentMessagesResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentMessagesResult'] =
+    ResolversParentTypes['AgentMessagesResult']
+> = ResolversObject<{
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  messages?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentModelInfoResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentModelInfoResult'] =
+    ResolversParentTypes['AgentModelInfoResult']
+> = ResolversObject<{
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  model?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentModelsResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentModelsResult'] =
+    ResolversParentTypes['AgentModelsResult']
+> = ResolversObject<{
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  providers?: Resolver<Maybe<ResolversTypes['JSON']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentPermissionListResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentPermissionListResult'] =
+    ResolversParentTypes['AgentPermissionListResult']
+> = ResolversObject<{
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  permissions?: Resolver<Array<ResolversTypes['PermissionRequest']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentReconnectResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentReconnectResult'] =
+    ResolversParentTypes['AgentReconnectResult']
+> = ResolversObject<{
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  revertMessageID?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  sessionStatus?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentRedoResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentRedoResult'] =
+    ResolversParentTypes['AgentRedoResult']
+> = ResolversObject<{
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  revertMessageID?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
 export type AgentSdkDetectionResolvers<
   ContextType = GraphQLContext,
   ParentType extends ResolversParentTypes['AgentSdkDetection'] =
@@ -1994,6 +2385,29 @@ export type AgentSdkDetectionResolvers<
   opencode?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
 }>
 
+export type AgentSessionInfoResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentSessionInfoResult'] =
+    ResolversParentTypes['AgentSessionInfoResult']
+> = ResolversObject<{
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  revertDiff?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  revertMessageID?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
+export type AgentUndoResultResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['AgentUndoResult'] =
+    ResolversParentTypes['AgentUndoResult']
+> = ResolversObject<{
+  error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  restoredPrompt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  revertDiff?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  revertMessageID?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>
+}>
+
 export type AppPathsResolvers<
   ContextType = GraphQLContext,
   ParentType extends ResolversParentTypes['AppPaths'] = ResolversParentTypes['AppPaths']
@@ -2001,6 +2415,19 @@ export type AppPathsResolvers<
   home?: Resolver<ResolversTypes['String'], ParentType, ContextType>
   logs?: Resolver<ResolversTypes['String'], ParentType, ContextType>
   userData?: Resolver<ResolversTypes['String'], ParentType, ContextType>
+}>
+
+export type CanonicalAgentEventResolvers<
+  ContextType = GraphQLContext,
+  ParentType extends ResolversParentTypes['CanonicalAgentEvent'] =
+    ResolversParentTypes['CanonicalAgentEvent']
+> = ResolversObject<{
+  childSessionId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  data?: Resolver<ResolversTypes['JSON'], ParentType, ContextType>
+  runtimeId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>
+  sessionId?: Resolver<ResolversTypes['String'], ParentType, ContextType>
+  statusPayload?: Resolver<Maybe<ResolversTypes['SessionStatusPayload']>, ParentType, ContextType>
+  type?: Resolver<ResolversTypes['String'], ParentType, ContextType>
 }>
 
 export type ConnectionResolvers<
@@ -2372,7 +2799,7 @@ export type GitStatusChangedEventResolvers<
   worktreePath?: Resolver<ResolversTypes['String'], ParentType, ContextType>
 }>
 
-export interface JsonScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['JSON'], unknown> {
+export interface JsonScalarConfig extends GraphQLScalarTypeConfig<ResolversTypes['JSON'], any> {
   name: 'JSON'
 }
 
@@ -3691,8 +4118,23 @@ export type WorktreeCreateResultResolvers<
 }>
 
 export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
+  AgentCapabilities?: AgentCapabilitiesResolvers<ContextType>
+  AgentCapabilitiesResult?: AgentCapabilitiesResultResolvers<ContextType>
+  AgentCommand?: AgentCommandResolvers<ContextType>
+  AgentCommandsResult?: AgentCommandsResultResolvers<ContextType>
+  AgentConnectResult?: AgentConnectResultResolvers<ContextType>
+  AgentForkResult?: AgentForkResultResolvers<ContextType>
+  AgentMessagesResult?: AgentMessagesResultResolvers<ContextType>
+  AgentModelInfoResult?: AgentModelInfoResultResolvers<ContextType>
+  AgentModelsResult?: AgentModelsResultResolvers<ContextType>
+  AgentPermissionListResult?: AgentPermissionListResultResolvers<ContextType>
+  AgentReconnectResult?: AgentReconnectResultResolvers<ContextType>
+  AgentRedoResult?: AgentRedoResultResolvers<ContextType>
   AgentSdkDetection?: AgentSdkDetectionResolvers<ContextType>
+  AgentSessionInfoResult?: AgentSessionInfoResultResolvers<ContextType>
+  AgentUndoResult?: AgentUndoResultResolvers<ContextType>
   AppPaths?: AppPathsResolvers<ContextType>
+  CanonicalAgentEvent?: CanonicalAgentEventResolvers<ContextType>
   Connection?: ConnectionResolvers<ContextType>
   ConnectionAddMemberResult?: ConnectionAddMemberResultResolvers<ContextType>
   ConnectionCreateResult?: ConnectionCreateResultResolvers<ContextType>

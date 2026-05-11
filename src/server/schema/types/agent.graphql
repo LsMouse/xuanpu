@@ -72,11 +72,11 @@ input AgentPromptInput {
   worktreePath: String!
   runtimeSessionId: String!
   message: String
-  parts: [MessagePartInput!]
-  model: ModelInput
+  parts: [AgentMessagePartInput!]
+  model: AgentModelInput
 }
 
-input MessagePartInput {
+input AgentMessagePartInput {
   type: String!
   text: String
   mime: String
@@ -84,13 +84,13 @@ input MessagePartInput {
   filename: String
 }
 
-input ModelInput {
+input AgentModelInput {
   providerID: String!
   modelID: String!
   variant: String
 }
 
-input SetModelInput {
+input AgentSetModelInput {
   providerID: String!
   modelID: String!
   variant: String
@@ -102,41 +102,41 @@ input AgentCommandInput {
   runtimeSessionId: String!
   command: String!
   args: String!
-  model: ModelInput
+  model: AgentModelInput
 }
 
-input RenameSessionInput {
+input AgentRenameSessionInput {
   runtimeSessionId: String!
   title: String!
   worktreePath: String
 }
 
-input ForkSessionInput {
+input AgentForkSessionInput {
   worktreePath: String!
   runtimeSessionId: String!
   messageId: String
 }
 
-input QuestionReplyInput {
+input AgentQuestionReplyInput {
   requestId: String!
   answers: [[String!]!]!
   worktreePath: String
 }
 
-input PlanApproveInput {
+input AgentPlanApproveInput {
   worktreePath: String!
   hiveSessionId: ID!
   requestId: String
 }
 
-input PlanRejectInput {
+input AgentPlanRejectInput {
   worktreePath: String!
   hiveSessionId: ID!
   feedback: String!
   requestId: String
 }
 
-input PermissionReplyInput {
+input AgentPermissionReplyInput {
   requestId: String!
   reply: String!
   worktreePath: String
