@@ -32,6 +32,7 @@ import {
   type HubBridge
 } from './hub-bridge'
 import { HubTerminalBridge } from './hub-terminal-bridge'
+import { HubTerminalRegistry } from './hub-terminal-registry'
 import { HubRegistry } from './hub-registry'
 import {
   createHubServer,
@@ -86,6 +87,7 @@ export interface HubStatusSnapshot {
 
 export class HubController extends EventEmitter {
   readonly registry: HubRegistry
+  readonly terminalRegistry: HubTerminalRegistry
   readonly bridge: HubBridge
   readonly terminalBridge: HubTerminalBridge
   readonly server: HubServer
@@ -100,6 +102,7 @@ export class HubController extends EventEmitter {
     this.defaultPort = opts.defaultPort ?? DEFAULT_HUB_PORT
 
     this.registry = new HubRegistry()
+    this.terminalRegistry = new HubTerminalRegistry()
 
     this.bridge = createHubBridge({
       registry: this.registry,
@@ -143,7 +146,7 @@ export class HubController extends EventEmitter {
     })
 
     this.terminalBridge = new HubTerminalBridge({
-      registry: this.registry,
+      registry: this.terminalRegistry,
       ptyService
     })
 

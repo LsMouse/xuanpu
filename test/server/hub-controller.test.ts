@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const getSession = vi.fn()
 const getWorktree = vi.fn()
 const updateSession = vi.fn()
+const terminalBridgeMock = vi.hoisted(() => ({
+  lastRegistry: null as { ensureTerminal?: unknown } | null
+}))
 
 vi.mock('../../src/main/services/logger', () => ({
   createLogger: () => ({
@@ -36,6 +39,10 @@ vi.mock('../../src/main/services/hub/hub-bridge', () => ({
 
 vi.mock('../../src/main/services/hub/hub-server', () => ({
   DEFAULT_HUB_PORT: 8317,
+  getHubEnabled: vi.fn(() => false),
+  getHubLanAddresses: vi.fn(() => []),
+  getHubListenHost: vi.fn(() => '127.0.0.1'),
+  normalizeHubListenHost: vi.fn((host) => (host === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1')),
   createHubServer: () => ({
     start: vi.fn(async () => ({ running: true, port: 8317, host: '127.0.0.1' })),
     stop: vi.fn(async () => undefined),
@@ -45,6 +52,14 @@ vi.mock('../../src/main/services/hub/hub-server', () => ({
   setHubAuthMode: vi.fn(),
   setHubCfAccessEmails: vi.fn(),
   setHubTunnelUrl: vi.fn()
+}))
+
+vi.mock('../../src/main/services/hub/hub-terminal-bridge', () => ({
+  HubTerminalBridge: class {
+    constructor(deps: { registry: { ensureTerminal?: unknown } }) {
+      terminalBridgeMock.lastRegistry = deps.registry
+    }
+  }
 }))
 
 vi.mock('../../src/main/services/hub/tunnel-service', () => ({
@@ -66,6 +81,19 @@ function makeController(runtimeManager: { getImplementer: ReturnType<typeof vi.f
     } as never
   })
 }
+
+describe('hub-controller: terminal bridge wiring', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    terminalBridgeMock.lastRegistry = null
+  })
+
+  it('passes a terminal registry to HubTerminalBridge', () => {
+    makeController({ getImplementer: vi.fn() })
+
+    expect(typeof terminalBridgeMock.lastRegistry?.ensureTerminal).toBe('function')
+  })
+})
 
 describe('hub-controller: lazyMaterialize', () => {
   beforeEach(() => {
