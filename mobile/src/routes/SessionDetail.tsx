@@ -182,11 +182,12 @@ function ShellModePane({
   worktreePath: string | null
 }): React.JSX.Element {
   const terminal = useTerminalStream(deviceId, worktreeId ?? 'missing-worktree')
+  const { attach } = terminal
 
   useEffect(() => {
     if (!worktreeId || !worktreePath) return
-    terminal.attach(worktreePath)
-  }, [terminal, worktreeId, worktreePath])
+    attach(worktreePath)
+  }, [attach, worktreeId, worktreePath])
 
   return (
     <MobileTerminalPane

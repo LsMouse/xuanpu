@@ -22,6 +22,11 @@ interface TerminalPtyService {
 }
 
 export class HubTerminalBridge {
+  private readonly terminalListenerCleanups = new Map<
+    string,
+    { removeData: () => void; removeExit: () => void }
+  >()
+
   constructor(
     private readonly deps: {
       registry: HubTerminalRegistry
@@ -70,33 +75,8 @@ export class HubTerminalBridge {
             cwd: msg.cwd,
             shell
           })
-          this.deps.ptyService.onData(terminalId, (data) => {
-            const statusFrame: TerminalServerMsg = {
-              type: 'terminal/status',
-              seq: session.seq.next(),
-              status: 'open'
-            }
-            if (session.status !== 'open') {
-              session.status = 'open'
-              this.deps.registry.broadcast(worktreeId, statusFrame)
-            }
-            const outputFrame: TerminalServerMsg = {
-              type: 'terminal/output',
-              seq: session.seq.next(),
-              data
-            }
-            this.deps.registry.broadcast(worktreeId, outputFrame)
-          })
-          this.deps.ptyService.onExit(terminalId, (code, signal) => {
-            const exitFrame: TerminalServerMsg = {
-              type: 'terminal/exit',
-              seq: session.seq.next(),
-              exitCode: code,
-              signal
-            }
-            this.deps.registry.broadcast(worktreeId, exitFrame)
-          })
         }
+        this.wirePtyListeners(worktreeId, terminalId, session)
 
         ws.send(
           JSON.stringify({
@@ -126,6 +106,7 @@ export class HubTerminalBridge {
         const session = this.deps.registry.getSession(worktreeId)
         const terminalId = session?.terminalId ?? worktreeId
         this.deps.ptyService.destroy(terminalId)
+        this.removePtyListeners(terminalId)
         if (session) {
           session.buffer = ''
           session.status = 'connecting'
@@ -133,12 +114,14 @@ export class HubTerminalBridge {
             cwd: session.cwd,
             shell: session.shell
           })
+          this.wirePtyListeners(worktreeId, terminalId, session)
         }
         return
       }
       case 'terminal/kill': {
         const terminalId = this.deps.registry.getSession(worktreeId)?.terminalId ?? worktreeId
         this.deps.ptyService.destroy(terminalId)
+        this.removePtyListeners(terminalId)
         return
       }
       case 'terminal/resume': {
@@ -163,5 +146,50 @@ export class HubTerminalBridge {
     } catch {
       log.warn('failed to send terminal error', { code, message })
     }
+  }
+
+  private wirePtyListeners(
+    worktreeId: string,
+    terminalId: string,
+    session: ReturnType<HubTerminalRegistry['ensureTerminal']>
+  ): void {
+    if (this.terminalListenerCleanups.has(terminalId)) return
+
+    const removeData = this.deps.ptyService.onData(terminalId, (data) => {
+      const statusFrame: TerminalServerMsg = {
+        type: 'terminal/status',
+        seq: session.seq.next(),
+        status: 'open'
+      }
+      if (session.status !== 'open') {
+        session.status = 'open'
+        this.deps.registry.broadcast(worktreeId, statusFrame)
+      }
+      const outputFrame: TerminalServerMsg = {
+        type: 'terminal/output',
+        seq: session.seq.next(),
+        data
+      }
+      this.deps.registry.broadcast(worktreeId, outputFrame)
+    })
+    const removeExit = this.deps.ptyService.onExit(terminalId, (code, signal) => {
+      const exitFrame: TerminalServerMsg = {
+        type: 'terminal/exit',
+        seq: session.seq.next(),
+        exitCode: code,
+        signal
+      }
+      this.deps.registry.broadcast(worktreeId, exitFrame)
+      this.terminalListenerCleanups.delete(terminalId)
+    })
+    this.terminalListenerCleanups.set(terminalId, { removeData, removeExit })
+  }
+
+  private removePtyListeners(terminalId: string): void {
+    const cleanup = this.terminalListenerCleanups.get(terminalId)
+    if (!cleanup) return
+    cleanup.removeData()
+    cleanup.removeExit()
+    this.terminalListenerCleanups.delete(terminalId)
   }
 }

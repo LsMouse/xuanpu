@@ -74,6 +74,24 @@ describe('hub-terminal-bridge', () => {
     expect(ws.sent[2]).toMatchObject({ type: 'terminal/output', data: 'hello' })
   })
 
+  it('wires terminal output when attaching to an existing PTY', async () => {
+    pty.has.mockReturnValue(true)
+    const bridge = new HubTerminalBridge({ registry, ptyService: pty as never })
+    const ws = makeWs()
+
+    await bridge.handleClientMessage(ws, 'wt-1', {
+      type: 'terminal/attach',
+      terminalId: 'wt-1',
+      cwd: '/tmp/project',
+      shell: '/bin/zsh'
+    })
+
+    expect(pty.create).not.toHaveBeenCalled()
+    expect(pty.onData).toHaveBeenCalledWith('wt-1', expect.any(Function))
+    emitData?.('ready\n')
+    expect(ws.sent.at(-1)).toMatchObject({ type: 'terminal/output', data: 'ready\n' })
+  })
+
   it('writes terminal input to the PTY', async () => {
     const bridge = new HubTerminalBridge({ registry, ptyService: pty as never })
     const ws = makeWs()

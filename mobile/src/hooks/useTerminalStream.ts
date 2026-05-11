@@ -1,6 +1,7 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 import {
   TerminalWebSocket,
+  type TerminalClientFrame,
   type TerminalConnectionState,
   type TerminalServerFrame
 } from '../api/terminal-ws'
@@ -81,8 +82,10 @@ export function useTerminalStream(deviceId: string, worktreeId: string): {
 } {
   const [state, dispatch] = useReducer(reducer, INITIAL)
   const wsRef = useRef<TerminalWebSocket | null>(null)
+  const attachFrameRef = useRef<TerminalClientFrame | null>(null)
 
   useEffect(() => {
+    attachFrameRef.current = null
     const ws = new TerminalWebSocket(deviceId, worktreeId)
     wsRef.current = ws
     const offFrame = ws.onFrame((frame) => dispatch({ type: 'frame', frame }))
@@ -93,23 +96,59 @@ export function useTerminalStream(deviceId: string, worktreeId: string): {
       offState()
       ws.destroy()
       wsRef.current = null
+      attachFrameRef.current = null
     }
   }, [deviceId, worktreeId])
 
-  return {
-    state,
-    attach: (cwd: string, shell?: string, terminalId?: string) => {
-      wsRef.current?.send({
+  const flushAttach = useCallback((): boolean => {
+    const frame = attachFrameRef.current
+    if (!frame) return false
+    return wsRef.current?.send(frame) ?? false
+  }, [])
+
+  useEffect(() => {
+    if (state.connection === 'open') {
+      flushAttach()
+    }
+  }, [flushAttach, state.connection])
+
+  const attach = useCallback(
+    (cwd: string, shell?: string, terminalId?: string): void => {
+      attachFrameRef.current = {
         type: 'terminal/attach',
         cwd,
         ...(shell ? { shell } : {}),
         ...(terminalId ? { terminalId } : {})
-      })
+      }
+      flushAttach()
     },
-    sendInput: (data: string) => wsRef.current?.send({ type: 'terminal/input', data }) ?? false,
-    resize: (cols: number, rows: number) =>
+    [flushAttach]
+  )
+
+  const sendInput = useCallback(
+    (data: string): boolean => wsRef.current?.send({ type: 'terminal/input', data }) ?? false,
+    []
+  )
+  const resize = useCallback(
+    (cols: number, rows: number): boolean =>
       wsRef.current?.send({ type: 'terminal/resize', cols, rows }) ?? false,
-    restart: () => wsRef.current?.send({ type: 'terminal/restart' }) ?? false,
-    kill: () => wsRef.current?.send({ type: 'terminal/kill' }) ?? false
+    []
+  )
+  const restart = useCallback(
+    (): boolean => wsRef.current?.send({ type: 'terminal/restart' }) ?? false,
+    []
+  )
+  const kill = useCallback(
+    (): boolean => wsRef.current?.send({ type: 'terminal/kill' }) ?? false,
+    []
+  )
+
+  return {
+    state,
+    attach,
+    sendInput,
+    resize,
+    restart,
+    kill
   }
 }

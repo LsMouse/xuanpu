@@ -2,27 +2,34 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const wsMock = vi.hoisted(() => {
-  let latestSocket: { emitFrame: (frame: unknown) => void; sent: unknown[] } | null = null
+  let latestSocket: {
+    emitFrame: (frame: unknown) => void
+    open: () => void
+    sent: unknown[]
+  } | null = null
 
   class MockTerminalWebSocket {
     private frameListeners = new Set<(frame: unknown) => void>()
     private stateListeners = new Set<(state: 'connecting' | 'open' | 'closed') => void>()
+    private isOpen = false
     sent: unknown[] = []
 
     constructor(_deviceId: string, _worktreeId: string) {
       latestSocket = {
         emitFrame: (frame: unknown) => this.emitFrame(frame),
+        open: () => this.open(),
         sent: this.sent
       }
     }
 
     connect(): void {
-      for (const listener of this.stateListeners) listener('open')
+      for (const listener of this.stateListeners) listener('connecting')
     }
 
     destroy(): void {}
 
     send(frame: unknown): boolean {
+      if (!this.isOpen) return false
       this.sent.push(frame)
       return true
     }
@@ -40,6 +47,11 @@ const wsMock = vi.hoisted(() => {
 
     emitFrame(frame: unknown): void {
       for (const listener of this.frameListeners) listener(frame)
+    }
+
+    open(): void {
+      this.isOpen = true
+      for (const listener of this.stateListeners) listener('open')
     }
   }
 
@@ -83,5 +95,29 @@ describe('useTerminalStream', () => {
 
     expect(result.current.state.buffer).toBe('boot\nnext\n')
     expect(result.current.state.status).toBe('open')
+  })
+
+  it('sends pending attach when the terminal websocket opens', () => {
+    const { result } = renderHook(() => useTerminalStream('device-1', 'wt-1'))
+    const socket = wsMock.getLatestSocket()
+
+    act(() => {
+      result.current.attach('/tmp/project', '/bin/zsh', 'wt-1')
+    })
+
+    expect(socket?.sent).toEqual([])
+
+    act(() => {
+      socket?.open()
+    })
+
+    expect(socket?.sent).toEqual([
+      {
+        type: 'terminal/attach',
+        cwd: '/tmp/project',
+        shell: '/bin/zsh',
+        terminalId: 'wt-1'
+      }
+    ])
   })
 })
